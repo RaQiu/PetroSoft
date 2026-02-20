@@ -1,0 +1,25 @@
+node_modules/
+dist/
+out/
+.DS_Store
+*.local
+*.log
+
+# Editor
+.vscode/
+.idea/
+
+# Python
+server/venv/
+server/__pycache__/
+server/**/__pycache__/
+*.pyc
+
+# Electron
+release/
+
+# Sample data
+data/logging1/
+
+# Claude
+.claude/
