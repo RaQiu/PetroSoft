@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as workareaApi from '@/api/workarea'
+import type { RecentWorkarea } from '@/api/workarea'
 import { useWellStore } from './well'
 
 export const useWorkareaStore = defineStore('workarea', () => {
@@ -9,6 +10,15 @@ export const useWorkareaStore = defineStore('workarea', () => {
   const path = ref('')
   const isOpen = ref(false)
   const lastOpened = ref('')
+  const recentWorkareas = ref<RecentWorkarea[]>([])
+
+  async function fetchRecentWorkareas() {
+    try {
+      recentWorkareas.value = await workareaApi.getRecentWorkareas()
+    } catch {
+      recentWorkareas.value = []
+    }
+  }
 
   function openWorkarea(workareaName: string, workareaPath: string) {
     name.value = workareaName
@@ -25,6 +35,7 @@ export const useWorkareaStore = defineStore('workarea', () => {
       const wellStore = useWellStore()
       await wellStore.fetchWells(res.path)
       ElMessage.success(`工区 "${workareaName}" 创建成功`)
+      fetchRecentWorkareas()
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '创建失败'
       ElMessage.error(msg)
@@ -39,6 +50,7 @@ export const useWorkareaStore = defineStore('workarea', () => {
       const wellStore = useWellStore()
       await wellStore.fetchWells(res.path)
       ElMessage.success(`工区 "${res.name}" 已打开，共 ${res.well_count} 口井`)
+      fetchRecentWorkareas()
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '打开失败'
       ElMessage.error(msg)
@@ -70,11 +82,13 @@ export const useWorkareaStore = defineStore('workarea', () => {
     path,
     isOpen,
     lastOpened,
+    recentWorkareas,
     openWorkarea,
     createWorkareaAndOpen,
     openWorkareaFromPath,
     openWorkareaFromDisk,
     closeWorkarea,
+    fetchRecentWorkareas,
     displayName
   }
 })

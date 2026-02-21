@@ -23,21 +23,27 @@ import type { ToolBarItem } from '@/types/toolbar'
 const dialogStore = useDialogStore()
 const workareaStore = useWorkareaStore()
 
+function requireWorkarea(action: () => void) {
+  if (!workareaStore.isOpen) {
+    ElMessage.warning('请先打开或创建工区')
+    return
+  }
+  action()
+}
+
 function onToolClick(item: ToolBarItem) {
   switch (item.id) {
     case 'tb-data-manage':
-      if (!workareaStore.isOpen) {
-        ElMessage.warning('请先打开或创建工区')
-        return
-      }
-      dialogStore.showDataManage()
+      requireWorkarea(() => dialogStore.showDataManage())
       break
     case 'tb-well-curve':
-      if (!workareaStore.isOpen) {
-        ElMessage.warning('请先打开或创建工区')
-        return
-      }
-      dialogStore.showWellCurve()
+      requireWorkarea(() => dialogStore.showWellCurve())
+      break
+    case 'tb-histogram':
+      requireWorkarea(() => dialogStore.showHistogram())
+      break
+    case 'tb-crossplot':
+      requireWorkarea(() => dialogStore.showCrossplot())
       break
     default:
       ElMessage.info(`「${item.label}」功能开发中...`)

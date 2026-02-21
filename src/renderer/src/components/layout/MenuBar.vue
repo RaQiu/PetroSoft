@@ -7,6 +7,22 @@
           <template v-for="item in menu.children" :key="item.id">
             <!-- Divider -->
             <div v-if="item.divider" class="menu-divider" />
+            <!-- Recent workareas (dynamic) -->
+            <el-sub-menu v-else-if="item.id === 'file.recent'" :index="item.id">
+              <template #title>{{ item.label }}</template>
+              <template v-if="recentItems.length">
+                <el-menu-item
+                  v-for="r in recentItems"
+                  :key="r.id"
+                  :index="r.id"
+                >
+                  <span>{{ r.label }}</span>
+                </el-menu-item>
+              </template>
+              <el-menu-item v-else index="file.recent.empty" disabled>
+                <span>(无)</span>
+              </el-menu-item>
+            </el-sub-menu>
             <!-- Sub-menu with children -->
             <el-sub-menu v-else-if="item.children && item.children.length" :index="item.id">
               <template #title>{{ item.label }}</template>
@@ -33,18 +49,35 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted } from 'vue'
 import { menuConfig } from '@/config/menus'
 import { useMenuAction } from '@/composables/useMenuAction'
+import { useWorkareaStore } from '@/stores/workarea'
 
 const { handleMenuClick } = useMenuAction()
+const workareaStore = useWorkareaStore()
+
+const recentItems = computed(() => {
+  return workareaStore.recentWorkareas.map((w) => ({
+    id: `file.recent.${w.path}`,
+    label: `${w.name} - ${w.path}`
+  }))
+})
+
+onMounted(() => {
+  workareaStore.fetchRecentWorkareas()
+})
 
 function onMenuSelect(index: string) {
-  // Find the label for the selected menu item
   const label = findMenuLabel(index)
   handleMenuClick(index, label)
 }
 
 function findMenuLabel(id: string): string {
+  // Check dynamic recent items first
+  for (const r of recentItems.value) {
+    if (r.id === id) return r.label
+  }
   for (const menu of menuConfig) {
     for (const item of menu.children) {
       if (item.id === id) return item.label

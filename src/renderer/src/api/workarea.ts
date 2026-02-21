@@ -29,3 +29,14 @@ export async function openWorkarea(path: string): Promise<OpenWorkareaResult> {
 export async function deleteWorkarea(name: string): Promise<void> {
   await apiClient.delete(`/workarea/${encodeURIComponent(name)}`)
 }
+
+export interface RecentWorkarea {
+  name: string
+  path: string
+  last_opened?: string
+}
+
+export async function getRecentWorkareas(): Promise<RecentWorkarea[]> {
+  const res = await apiClient.get('/workarea/recent')
+  return res.data.workareas
+}

@@ -9,9 +9,17 @@
     <!-- Dialogs -->
     <CreateWorkareaDialog />
     <ImportFileDialog />
+    <ExportFileDialog />
     <DataManageDialog />
     <WellListDialog />
     <WellCurveWindow />
+    <AboutDialog />
+    <HistogramDialog />
+    <CrossplotDialog />
+    <WellDataQueryDialog />
+    <ResampleDialog />
+    <FilterDialog />
+    <CurveCalculatorDialog />
   </div>
 </template>
 
@@ -23,9 +31,17 @@ import MainContent from '@/components/layout/MainContent.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
 import CreateWorkareaDialog from '@/components/dialogs/CreateWorkareaDialog.vue'
 import ImportFileDialog from '@/components/dialogs/ImportFileDialog.vue'
+import ExportFileDialog from '@/components/dialogs/ExportFileDialog.vue'
 import DataManageDialog from '@/components/dialogs/DataManageDialog.vue'
 import WellListDialog from '@/components/dialogs/WellListDialog.vue'
 import WellCurveWindow from '@/components/dialogs/WellCurveWindow.vue'
+import AboutDialog from '@/components/dialogs/AboutDialog.vue'
+import HistogramDialog from '@/components/dialogs/HistogramDialog.vue'
+import CrossplotDialog from '@/components/dialogs/CrossplotDialog.vue'
+import WellDataQueryDialog from '@/components/dialogs/WellDataQueryDialog.vue'
+import ResampleDialog from '@/components/dialogs/ResampleDialog.vue'
+import FilterDialog from '@/components/dialogs/FilterDialog.vue'
+import CurveCalculatorDialog from '@/components/dialogs/CurveCalculatorDialog.vue'
 </script>
 
 <style scoped lang="scss">

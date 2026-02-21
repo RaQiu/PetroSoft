@@ -42,17 +42,64 @@ export function useMenuAction() {
         requireWorkarea(() => dialogStore.showImportFile('lithology'))
         break
 
+      // Data export menu
+      case 'data.well-position.export':
+        requireWorkarea(() => dialogStore.showExportFile('coordinates'))
+        break
+      case 'data.well-deviation.export':
+        requireWorkarea(() => dialogStore.showExportFile('trajectory'))
+        break
+      case 'data.curve.export':
+        requireWorkarea(() => dialogStore.showExportFile('curves'))
+        break
+      case 'data.layer.export':
+        requireWorkarea(() => dialogStore.showExportFile('layers'))
+        break
+      case 'data.interpretation.export':
+        requireWorkarea(() => dialogStore.showExportFile('interpretation'))
+        break
+      case 'data.mud-log.export':
+        requireWorkarea(() => dialogStore.showExportFile('lithology'))
+        break
+
       // Data management
       case 'data.data-manage':
         requireWorkarea(() => dialogStore.showDataManage())
+        break
+
+      // Data query
+      case 'data.query.well':
+        requireWorkarea(() => dialogStore.showWellDataQuery())
         break
 
       // Well menu
       case 'well.manage':
         requireWorkarea(() => dialogStore.showWellList())
         break
+      case 'well.resample':
+        requireWorkarea(() => dialogStore.showResample())
+        break
+      case 'well.filter':
+        requireWorkarea(() => dialogStore.showFilter())
+        break
+      case 'well.calculator':
+        requireWorkarea(() => dialogStore.showCurveCalculator())
+        break
+
+      // Help menu
+      case 'help.about':
+        dialogStore.showAbout()
+        break
 
       default:
+        // Handle recent workarea clicks
+        if (menuId.startsWith('file.recent.')) {
+          const path = menuId.replace('file.recent.', '')
+          if (path && path !== 'empty') {
+            workareaStore.openWorkareaFromPath(path)
+          }
+          break
+        }
         ElMessage.info(`「${label}」功能开发中...`)
     }
   }

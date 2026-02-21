@@ -2,6 +2,7 @@
 
 import os
 import json
+from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -51,7 +52,11 @@ async def create_workarea(req: CreateWorkareaRequest):
     # Register in config
     workareas = _load_workareas()
     workareas = [w for w in workareas if w["path"] != workarea_path]
-    workareas.append({"name": req.name, "path": workarea_path})
+    workareas.append({
+        "name": req.name,
+        "path": workarea_path,
+        "last_opened": datetime.now().isoformat(),
+    })
     _save_workareas(workareas)
 
     return {"status": "ok", "name": req.name, "path": workarea_path}
@@ -85,9 +90,19 @@ async def open_workarea(req: OpenWorkareaRequest):
     name = os.path.basename(req.path)
 
     workareas = _load_workareas()
-    if not any(w["path"] == req.path for w in workareas):
-        workareas.append({"name": name, "path": req.path})
-        _save_workareas(workareas)
+    found = False
+    for w in workareas:
+        if w["path"] == req.path:
+            w["last_opened"] = datetime.now().isoformat()
+            found = True
+            break
+    if not found:
+        workareas.append({
+            "name": name,
+            "path": req.path,
+            "last_opened": datetime.now().isoformat(),
+        })
+    _save_workareas(workareas)
 
     return {
         "status": "ok",
@@ -95,6 +110,16 @@ async def open_workarea(req: OpenWorkareaRequest):
         "path": req.path,
         "well_count": well_count,
     }
+
+
+@router.get("/recent")
+async def get_recent_workareas():
+    """Get the 5 most recently opened workareas."""
+    workareas = _load_workareas()
+    valid = [w for w in workareas if os.path.isdir(w["path"])]
+    # Sort by last_opened descending
+    valid.sort(key=lambda w: w.get("last_opened", ""), reverse=True)
+    return {"status": "ok", "workareas": valid[:5]}
 
 
 @router.delete("/{name}")

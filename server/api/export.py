@@ -1,0 +1,183 @@
+"""Data export API endpoints."""
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from db import get_connection
+from exporters import (
+    format_coordinates,
+    format_trajectory,
+    format_curves,
+    format_layers,
+    format_lithology,
+    format_interpretation,
+    format_discrete,
+)
+
+router = APIRouter(prefix="/data", tags=["data-export"])
+
+
+class ExportRequest(BaseModel):
+    file_path: str
+    data_type: str
+    workarea_path: str
+    well_name: str = ""
+
+
+@router.post("/export")
+async def export_data(req: ExportRequest):
+    """Export data from workarea database to a file."""
+    try:
+        db = await get_connection(req.workarea_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"无法连接数据库: {e}")
+
+    try:
+        if req.data_type == "coordinates":
+            content = await _export_coordinates(db)
+        elif req.data_type == "trajectory":
+            content = await _export_trajectory(db, req.well_name)
+        elif req.data_type == "curves":
+            content = await _export_curves(db, req.well_name)
+        elif req.data_type == "layers":
+            content = await _export_layers(db)
+        elif req.data_type == "lithology":
+            content = await _export_lithology(db)
+        elif req.data_type == "interpretation":
+            content = await _export_interpretation(db)
+        elif req.data_type == "discrete":
+            content = await _export_discrete(db, req.well_name)
+        else:
+            raise HTTPException(status_code=400, detail=f"未知数据类型: {req.data_type}")
+
+        with open(req.file_path, "w", encoding="gb2312", errors="replace") as f:
+            f.write(content)
+
+        return {"status": "ok", "message": f"导出成功: {req.file_path}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导出失败: {e}")
+    finally:
+        await db.close()
+
+
+async def _export_coordinates(db):
+    cursor = await db.execute("SELECT name, x, y, kb, td FROM wells ORDER BY name")
+    rows = await cursor.fetchall()
+    wells = [{"name": r[0], "x": r[1], "y": r[2], "kb": r[3], "td": r[4]} for r in rows]
+    return format_coordinates(wells)
+
+
+async def _export_trajectory(db, well_name: str):
+    if not well_name:
+        raise HTTPException(status_code=400, detail="导出井轨迹需要指定井名")
+    cursor = await db.execute(
+        "SELECT t.depth, t.inclination, t.azimuth FROM trajectories t "
+        "JOIN wells w ON t.well_id = w.id WHERE w.name = ? ORDER BY t.depth",
+        (well_name,),
+    )
+    rows = await cursor.fetchall()
+    points = [{"depth": r[0], "inclination": r[1], "azimuth": r[2]} for r in rows]
+    return format_trajectory(points)
+
+
+async def _export_curves(db, well_name: str):
+    if not well_name:
+        raise HTTPException(status_code=400, detail="导出测井曲线需要指定井名")
+
+    # Get curve names
+    cursor = await db.execute(
+        "SELECT c.id, c.name FROM curves c "
+        "JOIN wells w ON c.well_id = w.id WHERE w.name = ? ORDER BY c.name",
+        (well_name,),
+    )
+    curve_rows = await cursor.fetchall()
+    if not curve_rows:
+        raise HTTPException(status_code=404, detail=f"井 '{well_name}' 无曲线数据")
+
+    curve_names = [r[1] for r in curve_rows]
+    curve_ids = {r[1]: r[0] for r in curve_rows}
+
+    # Build depth-indexed data
+    data_by_depth: dict[float, dict[str, float | None]] = {}
+    for cname in curve_names:
+        cid = curve_ids[cname]
+        cursor = await db.execute(
+            "SELECT depth, value FROM curve_data WHERE curve_id = ? ORDER BY depth",
+            (cid,),
+        )
+        for row in await cursor.fetchall():
+            depth = row[0]
+            if depth not in data_by_depth:
+                data_by_depth[depth] = {}
+            data_by_depth[depth][cname] = row[1]
+
+    return format_curves(curve_names, data_by_depth)
+
+
+async def _export_layers(db):
+    cursor = await db.execute(
+        "SELECT w.name, l.formation, l.top_depth, l.bottom_depth "
+        "FROM layers l JOIN wells w ON l.well_id = w.id "
+        "ORDER BY w.name, l.top_depth"
+    )
+    rows = await cursor.fetchall()
+    layers = [
+        {"well_name": r[0], "formation": r[1], "top_depth": r[2], "bottom_depth": r[3]}
+        for r in rows
+    ]
+    return format_layers(layers)
+
+
+async def _export_lithology(db):
+    cursor = await db.execute(
+        "SELECT w.name, l.top_depth, l.bottom_depth, l.description "
+        "FROM lithology l JOIN wells w ON l.well_id = w.id "
+        "ORDER BY w.name, l.top_depth"
+    )
+    rows = await cursor.fetchall()
+    entries = [
+        {"well_name": r[0], "top_depth": r[1], "bottom_depth": r[2], "description": r[3]}
+        for r in rows
+    ]
+    return format_lithology(entries)
+
+
+async def _export_interpretation(db):
+    cursor = await db.execute(
+        "SELECT w.name, i.top_depth, i.bottom_depth, i.conclusion, i.category "
+        "FROM interpretations i JOIN wells w ON i.well_id = w.id "
+        "ORDER BY w.name, i.top_depth"
+    )
+    rows = await cursor.fetchall()
+    entries = [
+        {
+            "well_name": r[0],
+            "top_depth": r[1],
+            "bottom_depth": r[2],
+            "conclusion": r[3],
+            "category": r[4],
+        }
+        for r in rows
+    ]
+    return format_interpretation(entries)
+
+
+async def _export_discrete(db, well_name: str):
+    if not well_name:
+        raise HTTPException(status_code=400, detail="导出离散曲线需要指定井名")
+    cursor = await db.execute(
+        "SELECT dc.curve_name, dc.depth, dc.value FROM discrete_curves dc "
+        "JOIN wells w ON dc.well_id = w.id WHERE w.name = ? "
+        "ORDER BY dc.curve_name, dc.depth",
+        (well_name,),
+    )
+    rows = await cursor.fetchall()
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"井 '{well_name}' 无离散曲线数据")
+
+    # Use first curve name found
+    curve_name = rows[0][0]
+    points = [{"depth": r[1], "value": r[2]} for r in rows if r[0] == curve_name]
+    return format_discrete(curve_name, points)

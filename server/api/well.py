@@ -1,5 +1,6 @@
 """Well data query API endpoints."""
 
+import math
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
@@ -262,6 +263,100 @@ async def get_well_summary(
                 "td": well_row[5],
             },
             "data_counts": counts,
+        }
+    finally:
+        await db.close()
+
+
+@router.get("/{well_name}/query")
+async def query_well_data(
+    well_name: str,
+    workarea: str = Query(..., description="工区路径"),
+    curves: str = Query("", description="曲线名称，逗号分隔"),
+    depth_min: Optional[float] = Query(None),
+    depth_max: Optional[float] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=5000),
+):
+    """Query well curve data with pagination."""
+    try:
+        db = await get_connection(workarea)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    try:
+        # Get well
+        cursor = await db.execute("SELECT id FROM wells WHERE name = ?", (well_name,))
+        well_row = await cursor.fetchone()
+        if not well_row:
+            raise HTTPException(status_code=404, detail=f"井 '{well_name}' 不存在")
+        well_id = well_row[0]
+
+        # Determine which curves to query
+        curve_names = [c.strip() for c in curves.split(",") if c.strip()] if curves else []
+        if not curve_names:
+            # Get all curves
+            cursor = await db.execute(
+                "SELECT name FROM curves WHERE well_id = ? ORDER BY name", (well_id,)
+            )
+            curve_names = [r[0] for r in await cursor.fetchall()]
+
+        if not curve_names:
+            return {"status": "ok", "columns": ["深度"], "rows": [], "total": 0, "page": page, "page_size": page_size}
+
+        # Get curve IDs
+        curve_ids = {}
+        for cn in curve_names:
+            cursor = await db.execute(
+                "SELECT id FROM curves WHERE well_id = ? AND name = ?", (well_id, cn)
+            )
+            row = await cursor.fetchone()
+            if row:
+                curve_ids[cn] = row[0]
+
+        # Build depth-indexed data
+        all_depths: set[float] = set()
+        data_map: dict[str, dict[float, float | None]] = {cn: {} for cn in curve_ids}
+        for cn, cid in curve_ids.items():
+            query = "SELECT depth, value FROM curve_data WHERE curve_id = ?"
+            params: list = [cid]
+            if depth_min is not None:
+                query += " AND depth >= ?"
+                params.append(depth_min)
+            if depth_max is not None:
+                query += " AND depth <= ?"
+                params.append(depth_max)
+            query += " ORDER BY depth"
+            cursor = await db.execute(query, params)
+            for row in await cursor.fetchall():
+                all_depths.add(row[0])
+                data_map[cn][row[0]] = row[1]
+
+        sorted_depths = sorted(all_depths)
+        total = len(sorted_depths)
+        total_pages = math.ceil(total / page_size) if total > 0 else 1
+
+        # Paginate
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_depths = sorted_depths[start:end]
+
+        columns = ["深度"] + list(curve_ids.keys())
+        rows = []
+        for d in page_depths:
+            row_data = [d]
+            for cn in curve_ids:
+                row_data.append(data_map[cn].get(d))
+            rows.append(row_data)
+
+        return {
+            "status": "ok",
+            "columns": columns,
+            "rows": rows,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
         }
     finally:
         await db.close()
