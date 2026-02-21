@@ -162,6 +162,7 @@ async function onNodeClick(node: TreeNode) {
 }
 
 function onImport() {
+  dialogStore.dataManageVisible = false
   dialogStore.showImportFile()
 }
 

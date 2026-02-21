@@ -4,6 +4,7 @@
     title="导出数据"
     width="520px"
     :close-on-click-modal="false"
+    append-to-body
   >
     <el-form :model="form" label-width="80px">
       <el-form-item label="数据类型">
