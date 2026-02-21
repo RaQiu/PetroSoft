@@ -91,8 +91,24 @@ install_deps() {
     ok "后端依赖安装完成"
 }
 
+# ---------- 清理占用端口的进程 ----------
+kill_port() {
+    local port=$1
+    local pids
+    pids=$(lsof -ti:"$port" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+        warn "端口 $port 被占用，正在清理 (PID: $(echo $pids | tr '\n' ' '))"
+        echo "$pids" | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+}
+
 # ---------- 启动服务 ----------
 start_services() {
+    # 清理可能残留的旧进程
+    kill_port 20022
+    kill_port 20012
+
     info "===== 启动后端 (FastAPI :20022) ====="
     cd "$SCRIPT_DIR/server"
     $PYTHON -m uvicorn main:app --host 127.0.0.1 --port 20022 --reload &

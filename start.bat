@@ -93,8 +93,21 @@ if %ERRORLEVEL% neq 0 (
 )
 echo [OK]    后端依赖安装完成
 
-REM ---------- 启动服务 ----------
+REM ---------- 清理占用端口的进程 ----------
 :start
+echo.
+echo [INFO]  ===== 清理残留进程 =====
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":20022 " ^| findstr "LISTENING" 2^>nul') do (
+    echo [WARN]  端口 20022 被占用 ^(PID: %%p^)，正在清理...
+    taskkill /f /pid %%p >nul 2>&1
+)
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":20012 " ^| findstr "LISTENING" 2^>nul') do (
+    echo [WARN]  端口 20012 被占用 ^(PID: %%p^)，正在清理...
+    taskkill /f /pid %%p >nul 2>&1
+)
+timeout /t 1 /nobreak >nul
+
+REM ---------- 启动服务 ----------
 echo.
 echo [INFO]  ===== 启动后端 (FastAPI :20022) =====
 cd /d "%ROOT%server"
