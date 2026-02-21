@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
 import { useWellStore } from '@/stores/well'
@@ -68,6 +69,8 @@ watch(
   () => dialogStore.dataManageVisible,
   async (visible) => {
     if (visible) {
+      tableData.value = []
+      tableColumns.value = []
       await buildTree()
     }
   }
@@ -107,49 +110,54 @@ async function onNodeClick(node: TreeNode) {
   const wellName = node.wellName
   const wa = workareaStore.path
 
-  if (node.type === 'well') {
-    tableColumns.value = [
-      { prop: 'name', label: '井名', width: 120 },
-      { prop: 'x', label: 'X坐标', width: 120 },
-      { prop: 'y', label: 'Y坐标', width: 120 },
-      { prop: 'kb', label: 'KB', width: 80 },
-      { prop: 'td', label: 'TD', width: 80 }
-    ]
-    const well = wellStore.wells.find((w) => w.name === wellName)
-    tableData.value = well ? [well] : []
-  } else if (node.type === 'curves') {
-    tableColumns.value = [
-      { prop: 'name', label: '曲线名', width: 150 },
-      { prop: 'unit', label: '单位', width: 100 },
-      { prop: 'sample_interval', label: '采样间隔', width: 100 }
-    ]
-    const curves = await getWellCurves(wellName, wa)
-    tableData.value = curves
-  } else if (node.type === 'layers') {
-    tableColumns.value = [
-      { prop: 'formation', label: '层位', width: 150 },
-      { prop: 'top_depth', label: '顶深', width: 100 },
-      { prop: 'bottom_depth', label: '底深', width: 100 }
-    ]
-    const layers = await getLayers(wellName, wa)
-    tableData.value = layers
-  } else if (node.type === 'lithology') {
-    tableColumns.value = [
-      { prop: 'top_depth', label: '顶深', width: 80 },
-      { prop: 'bottom_depth', label: '底深', width: 80 },
-      { prop: 'description', label: '岩性描述', width: 250 }
-    ]
-    const litho = await getLithology(wellName, wa)
-    tableData.value = litho
-  } else if (node.type === 'interpretation') {
-    tableColumns.value = [
-      { prop: 'top_depth', label: '顶深', width: 80 },
-      { prop: 'bottom_depth', label: '底深', width: 80 },
-      { prop: 'conclusion', label: '结论', width: 150 },
-      { prop: 'category', label: '类型', width: 100 }
-    ]
-    const interp = await getInterpretation(wellName, wa)
-    tableData.value = interp
+  try {
+    if (node.type === 'well') {
+      tableColumns.value = [
+        { prop: 'name', label: '井名', width: 120 },
+        { prop: 'x', label: 'X坐标', width: 120 },
+        { prop: 'y', label: 'Y坐标', width: 120 },
+        { prop: 'kb', label: 'KB', width: 80 },
+        { prop: 'td', label: 'TD', width: 80 }
+      ]
+      const well = wellStore.wells.find((w) => w.name === wellName)
+      tableData.value = well ? [well] : []
+    } else if (node.type === 'curves') {
+      tableColumns.value = [
+        { prop: 'name', label: '曲线名', width: 150 },
+        { prop: 'unit', label: '单位', width: 100 },
+        { prop: 'sample_interval', label: '采样间隔', width: 100 }
+      ]
+      const curves = await getWellCurves(wellName, wa)
+      tableData.value = curves
+    } else if (node.type === 'layers') {
+      tableColumns.value = [
+        { prop: 'formation', label: '层位', width: 150 },
+        { prop: 'top_depth', label: '顶深', width: 100 },
+        { prop: 'bottom_depth', label: '底深', width: 100 }
+      ]
+      const layers = await getLayers(wellName, wa)
+      tableData.value = layers
+    } else if (node.type === 'lithology') {
+      tableColumns.value = [
+        { prop: 'top_depth', label: '顶深', width: 80 },
+        { prop: 'bottom_depth', label: '底深', width: 80 },
+        { prop: 'description', label: '岩性描述', width: 250 }
+      ]
+      const litho = await getLithology(wellName, wa)
+      tableData.value = litho
+    } else if (node.type === 'interpretation') {
+      tableColumns.value = [
+        { prop: 'top_depth', label: '顶深', width: 80 },
+        { prop: 'bottom_depth', label: '底深', width: 80 },
+        { prop: 'conclusion', label: '结论', width: 150 },
+        { prop: 'category', label: '类型', width: 100 }
+      ]
+      const interp = await getInterpretation(wellName, wa)
+      tableData.value = interp
+    }
+  } catch {
+    ElMessage.error('加载数据失败')
+    tableData.value = []
   }
 }
 
