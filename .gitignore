@@ -18,8 +18,9 @@ server/**/__pycache__/
 # Electron
 release/
 
-# Sample data
+# Sample/test data
 data/logging1/
+data/test/
 
 # Claude
 .claude/
