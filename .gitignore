@@ -18,9 +18,9 @@ server/**/__pycache__/
 # Electron
 release/
 
-# Sample/test data
-data/logging1/
-data/test/
+# Data directory (only keep .gitkeep)
+data/*
+!data/.gitkeep
 
 # Claude
 .claude/
