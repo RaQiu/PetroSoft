@@ -26,8 +26,23 @@ export async function openWorkarea(path: string): Promise<OpenWorkareaResult> {
   return res.data
 }
 
-export async function deleteWorkarea(name: string): Promise<void> {
-  await apiClient.delete(`/workarea/${encodeURIComponent(name)}`)
+export async function deleteWorkarea(path: string): Promise<void> {
+  await apiClient.delete('/workarea/remove', { params: { path } })
+}
+
+export async function saveWorkarea(path: string): Promise<void> {
+  await apiClient.post('/workarea/save', { path })
+}
+
+export async function backupWorkarea(workareaPath: string, backupPath: string): Promise<void> {
+  await apiClient.post('/workarea/backup', {
+    workarea_path: workareaPath,
+    backup_path: backupPath
+  })
+}
+
+export async function clearCache(path: string): Promise<void> {
+  await apiClient.post('/workarea/clear-cache', { path })
 }
 
 export interface RecentWorkarea {

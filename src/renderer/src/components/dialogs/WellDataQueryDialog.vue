@@ -72,6 +72,15 @@ watch(
   () => dialogStore.wellDataQueryVisible,
   (visible) => {
     if (visible && workareaStore.isOpen) {
+      selectedWell.value = ''
+      selectedCurves.value = []
+      availableCurves.value = []
+      depthMin.value = undefined
+      depthMax.value = undefined
+      columns.value = []
+      tableData.value = []
+      currentPage.value = 1
+      total.value = 0
       wellStore.fetchWells(workareaStore.path)
     }
   }

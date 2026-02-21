@@ -63,7 +63,15 @@ const form = reactive({
 const canSubmit = computed(() => form.wellName && form.curveName && form.windowSize >= 3 && form.resultName)
 
 watch(() => dialogStore.filterVisible, (visible) => {
-  if (visible && workareaStore.isOpen) wellStore.fetchWells(workareaStore.path)
+  if (visible && workareaStore.isOpen) {
+    form.wellName = ''
+    form.curveName = ''
+    form.filterType = 'moving_average'
+    form.windowSize = 5
+    form.resultName = ''
+    availableCurves.value = []
+    wellStore.fetchWells(workareaStore.path)
+  }
 })
 
 async function onWellChange(wellName: string) {

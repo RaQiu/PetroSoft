@@ -84,6 +84,12 @@ watch(
   () => dialogStore.histogramVisible,
   (visible) => {
     if (visible && workareaStore.isOpen) {
+      selectedWell.value = ''
+      selectedCurve.value = ''
+      availableCurves.value = []
+      chartOption.value = null
+      stats.value = null
+      bins.value = 30
       wellStore.fetchWells(workareaStore.path)
     }
   }

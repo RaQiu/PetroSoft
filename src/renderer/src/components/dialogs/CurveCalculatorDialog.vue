@@ -76,7 +76,21 @@ const form = reactive({
 const canSubmit = computed(() => form.wellName && form.expression && form.resultName)
 
 watch(() => dialogStore.curveCalculatorVisible, (visible) => {
-  if (visible && workareaStore.isOpen) wellStore.fetchWells(workareaStore.path)
+  if (visible && workareaStore.isOpen) {
+    form.wellName = ''
+    form.expression = ''
+    form.resultName = ''
+    form.resultUnit = ''
+    availableCurves.value = []
+    wellStore.fetchWells(workareaStore.path)
+    // Apply preset if provided (e.g. impedance calculation)
+    const preset = dialogStore.curveCalculatorPreset
+    if (preset.expression) {
+      form.expression = preset.expression
+      form.resultName = preset.resultName
+      form.resultUnit = preset.resultUnit
+    }
+  }
 })
 
 async function onWellChange(wellName: string) {

@@ -81,6 +81,12 @@ watch(
   () => dialogStore.crossplotVisible,
   (visible) => {
     if (visible && workareaStore.isOpen) {
+      selectedWell.value = ''
+      xCurve.value = ''
+      yCurve.value = ''
+      colorCurve.value = ''
+      availableCurves.value = []
+      chartOption.value = null
       wellStore.fetchWells(workareaStore.path)
     }
   }
@@ -135,6 +141,11 @@ async function plot() {
       }
     }
 
+    if (points.length === 0) {
+      chartOption.value = null
+      return
+    }
+
     const option: Record<string, unknown> = {
       tooltip: {
         formatter: (p: { value: number[] }) =>
@@ -147,7 +158,7 @@ async function plot() {
         min: cMin,
         max: cMax,
         dimension: 2,
-        text: [colorCurve.value || '深度'],
+        text: [colorCurve.value || '深度', ''],
         inRange: { color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#fee090', '#fdae61', '#f46d43', '#d73027'] },
         right: 10,
         top: 'center'

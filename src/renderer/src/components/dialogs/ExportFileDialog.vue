@@ -82,9 +82,9 @@ watch(
   () => dialogStore.exportFileVisible,
   (visible) => {
     if (visible) {
-      if (dialogStore.exportPresetType) {
-        form.dataType = dialogStore.exportPresetType
-      }
+      form.dataType = dialogStore.exportPresetType || ''
+      form.filePath = ''
+      form.wellName = ''
       if (workareaStore.isOpen) {
         wellStore.fetchWells(workareaStore.path)
       }

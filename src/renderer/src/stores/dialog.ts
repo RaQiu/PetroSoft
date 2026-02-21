@@ -15,10 +15,17 @@ export const useDialogStore = defineStore('dialog', () => {
   const resampleVisible = ref(false)
   const filterVisible = ref(false)
   const curveCalculatorVisible = ref(false)
+  const standardizeVisible = ref(false)
 
   // Pre-set data type for import/export dialog
   const importPresetType = ref('')
   const exportPresetType = ref('')
+
+  // Pre-set for curve calculator (e.g. impedance calculation)
+  const curveCalculatorPreset = ref({ expression: '', resultName: '', resultUnit: '' })
+
+  // Pre-set for standardize dialog
+  const standardizePresetMethod = ref('')
 
   function showCreateWorkarea() {
     createWorkareaVisible.value = true
@@ -70,8 +77,35 @@ export const useDialogStore = defineStore('dialog', () => {
     filterVisible.value = true
   }
 
-  function showCurveCalculator() {
+  function showCurveCalculator(preset?: { expression: string; resultName: string; resultUnit: string }) {
+    if (preset) {
+      curveCalculatorPreset.value = preset
+    } else {
+      curveCalculatorPreset.value = { expression: '', resultName: '', resultUnit: '' }
+    }
     curveCalculatorVisible.value = true
+  }
+
+  function showStandardize(method = '') {
+    standardizePresetMethod.value = method
+    standardizeVisible.value = true
+  }
+
+  function closeAllDialogs() {
+    createWorkareaVisible.value = false
+    importFileVisible.value = false
+    dataManageVisible.value = false
+    wellListVisible.value = false
+    wellCurveVisible.value = false
+    exportFileVisible.value = false
+    aboutVisible.value = false
+    histogramVisible.value = false
+    crossplotVisible.value = false
+    wellDataQueryVisible.value = false
+    resampleVisible.value = false
+    filterVisible.value = false
+    curveCalculatorVisible.value = false
+    standardizeVisible.value = false
   }
 
   return {
@@ -88,8 +122,11 @@ export const useDialogStore = defineStore('dialog', () => {
     resampleVisible,
     filterVisible,
     curveCalculatorVisible,
+    standardizeVisible,
     importPresetType,
     exportPresetType,
+    curveCalculatorPreset,
+    standardizePresetMethod,
     showCreateWorkarea,
     showImportFile,
     showExportFile,
@@ -102,6 +139,8 @@ export const useDialogStore = defineStore('dialog', () => {
     showWellDataQuery,
     showResample,
     showFilter,
-    showCurveCalculator
+    showCurveCalculator,
+    showStandardize,
+    closeAllDialogs
   }
 })

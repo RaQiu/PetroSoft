@@ -39,36 +39,44 @@ def format_curves(curve_names: list[str], data_by_depth: dict[float, dict[str, f
 
 
 def format_layers(layers: list[dict]) -> str:
-    lines = ["井名\t层位\t顶深\t底深\t厚度"]
+    # Format: 井名 \t 编号 \t 顶 \t 底 \t 厚 \t 说明 (matches import parser)
+    lines = ["井名\t编号\t顶\t底\t厚\t说明"]
     for la in layers:
-        top = la['top_depth']
-        bot = la['bottom_depth']
-        thickness = bot - top if top is not None and bot is not None else 0
+        top = la['top_depth'] if la['top_depth'] is not None else 0
+        bot = la['bottom_depth'] if la['bottom_depth'] is not None else 0
+        thickness = bot - top
         lines.append(
-            f"{la['well_name']}\t{la.get('formation', '')}\t"
-            f"{top:.1f}\t{bot:.1f}\t{thickness:.1f}"
+            f"{la['well_name']}\t\t"
+            f"{top:.1f}\t{bot:.1f}\t{thickness:.1f}\t{la.get('formation', '')}"
         )
     return "\n".join(lines) + "\n"
 
 
 def format_lithology(entries: list[dict]) -> str:
-    lines = ["井名\t顶深\t底深\t厚度\t岩性描述"]
+    # Format: 井名 \t 编号 \t 顶 \t 底 \t 厚 \t 岩性 (matches import parser)
+    lines = ["井名\t编号\t顶\t底\t厚\t岩性"]
     for e in entries:
-        top = e['top_depth']
-        bot = e['bottom_depth']
-        thickness = bot - top if top is not None and bot is not None else 0
+        top = e['top_depth'] if e['top_depth'] is not None else 0
+        bot = e['bottom_depth'] if e['bottom_depth'] is not None else 0
+        thickness = bot - top
         lines.append(
-            f"{e['well_name']}\t{top:.1f}\t{bot:.1f}\t{thickness:.1f}\t{e.get('description', '')}"
+            f"{e['well_name']}\t\t"
+            f"{top:.1f}\t{bot:.1f}\t{thickness:.1f}\t{e.get('description', '')}"
         )
     return "\n".join(lines) + "\n"
 
 
 def format_interpretation(entries: list[dict]) -> str:
-    lines = ["井名\t顶深\t底深\t结论\t分类"]
+    # Format: 井名 \t [空] \t 顶 \t 底 \t 厚 \t 有效厚度 \t 综合结论 (matches import parser)
+    lines = ["井名\t编号\t顶\t底\t厚\t有效厚度\t综合结论"]
     for e in entries:
+        top = e['top_depth'] if e['top_depth'] is not None else 0
+        bot = e['bottom_depth'] if e['bottom_depth'] is not None else 0
+        thickness = bot - top
         lines.append(
-            f"{e['well_name']}\t{e['top_depth']:.1f}\t{e['bottom_depth']:.1f}\t"
-            f"{e.get('conclusion', '')}\t{e.get('category', '')}"
+            f"{e['well_name']}\t\t"
+            f"{top:.1f}\t{bot:.1f}\t{thickness:.1f}\t{thickness:.3f}\t"
+            f"{e.get('conclusion', '')}"
         )
     return "\n".join(lines) + "\n"
 

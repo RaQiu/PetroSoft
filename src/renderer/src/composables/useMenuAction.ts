@@ -1,6 +1,7 @@
 import { ElMessage } from 'element-plus'
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
+import * as workareaApi from '@/api/workarea'
 
 export function useMenuAction() {
   const dialogStore = useDialogStore()
@@ -15,8 +16,17 @@ export function useMenuAction() {
       case 'file.open-workarea':
         workareaStore.openWorkareaFromDisk()
         break
+      case 'file.save-workarea':
+        requireWorkarea(() => saveWorkarea())
+        break
+      case 'file.backup-data':
+        requireWorkarea(() => backupData())
+        break
       case 'file.close-workarea':
         workareaStore.closeWorkarea()
+        break
+      case 'file.clear-cache':
+        requireWorkarea(() => clearCache())
         break
       case 'file.exit':
         window.close()
@@ -85,8 +95,34 @@ export function useMenuAction() {
       case 'well.calculator':
         requireWorkarea(() => dialogStore.showCurveCalculator())
         break
+      case 'well.calc-impedance':
+        requireWorkarea(() =>
+          dialogStore.showCurveCalculator({
+            expression: 'DEN * (1000000 / DT)',
+            resultName: 'IMP',
+            resultUnit: 'g/cc·m/s'
+          })
+        )
+        break
+      case 'well.standardize.zscore':
+        requireWorkarea(() => dialogStore.showStandardize('zscore'))
+        break
+      case 'well.standardize.minmax':
+        requireWorkarea(() => dialogStore.showStandardize('minmax'))
+        break
+      case 'well.normalize':
+        requireWorkarea(() => dialogStore.showStandardize('normalize'))
+        break
+
+      // Window menu
+      case 'window.close-all':
+        dialogStore.closeAllDialogs()
+        break
 
       // Help menu
+      case 'help.manual':
+        ElMessage.info('用户手册编写中...')
+        break
       case 'help.about':
         dialogStore.showAbout()
         break
@@ -110,6 +146,35 @@ export function useMenuAction() {
       return
     }
     action()
+  }
+
+  async function saveWorkarea() {
+    try {
+      await workareaApi.saveWorkarea(workareaStore.path)
+      ElMessage.success('工区已保存')
+    } catch {
+      ElMessage.error('保存失败')
+    }
+  }
+
+  async function backupData() {
+    const result = await window.api.saveFile(`${workareaStore.name}_backup.db`)
+    if (result.canceled || !result.filePath) return
+    try {
+      await workareaApi.backupWorkarea(workareaStore.path, result.filePath)
+      ElMessage.success('备份成功')
+    } catch {
+      ElMessage.error('备份失败')
+    }
+  }
+
+  async function clearCache() {
+    try {
+      await workareaApi.clearCache(workareaStore.path)
+      ElMessage.success('缓存已清除')
+    } catch {
+      ElMessage.error('清除缓存失败')
+    }
   }
 
   return { handleMenuClick }

@@ -16,8 +16,12 @@ export interface StatsResult {
 export function computeHistogram(values: number[], bins: number): HistogramBin[] {
   if (values.length === 0 || bins <= 0) return []
 
-  const min = Math.min(...values)
-  const max = Math.max(...values)
+  let min = values[0]
+  let max = values[0]
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] < min) min = values[i]
+    if (values[i] > max) max = values[i]
+  }
   if (min === max) {
     return [{ min, max, count: values.length }]
   }

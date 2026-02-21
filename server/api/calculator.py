@@ -36,9 +36,11 @@ async def calculate_curve(well_name: str, req: CalculateRequest):
         curve_map = {r[1]: r[0] for r in curve_rows}
         sample_interval = curve_rows[0][2] if curve_rows else 0.125
 
-        # Load data for curves referenced in expression
+        # Only load curves that are referenced in the expression
         curve_data: dict[str, list[tuple[float, float | None]]] = {}
         for cname, cid in curve_map.items():
+            if cname not in req.expression:
+                continue
             cursor = await db.execute(
                 "SELECT depth, value FROM curve_data WHERE curve_id = ? ORDER BY depth",
                 (cid,),

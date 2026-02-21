@@ -177,7 +177,17 @@ async def _export_discrete(db, well_name: str):
     if not rows:
         raise HTTPException(status_code=404, detail=f"井 '{well_name}' 无离散曲线数据")
 
-    # Use first curve name found
-    curve_name = rows[0][0]
-    points = [{"depth": r[1], "value": r[2]} for r in rows if r[0] == curve_name]
-    return format_discrete(curve_name, points)
+    # Export all discrete curves, separated by blank lines
+    sections = []
+    current_name = None
+    current_points = []
+    for r in rows:
+        if r[0] != current_name:
+            if current_name is not None:
+                sections.append(format_discrete(current_name, current_points))
+            current_name = r[0]
+            current_points = []
+        current_points.append({"depth": r[1], "value": r[2]})
+    if current_name is not None:
+        sections.append(format_discrete(current_name, current_points))
+    return "\n".join(sections)

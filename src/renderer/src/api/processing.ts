@@ -30,3 +30,18 @@ export async function filterCurve(
   const res = await apiClient.post(`/well/${encodeURIComponent(wellName)}/filter`, params)
   return res.data
 }
+
+export interface StandardizeParams {
+  workarea_path: string
+  curve_name: string
+  method: string
+  result_curve_name: string
+}
+
+export async function standardizeCurve(
+  wellName: string,
+  params: StandardizeParams
+): Promise<{ message: string }> {
+  const res = await apiClient.post(`/well/${encodeURIComponent(wellName)}/standardize`, params)
+  return res.data
+}
