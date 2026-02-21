@@ -120,14 +120,15 @@ def kill_port(port):
 
 
 def wait_for_backend(timeout=20):
-    """等待后端 HTTP 服务就绪"""
+    """等待后端 HTTP 服务就绪（直接用 socket，绕过任何代理）"""
     for i in range(timeout):
         try:
-            with socket.create_connection(("127.0.0.1", 20022), timeout=1):
-                # 端口可连接，再试 HTTP
-                import urllib.request
-                req = urllib.request.Request("http://127.0.0.1:20022/api/health")
-                urllib.request.urlopen(req, timeout=2)
+            sock = socket.create_connection(("127.0.0.1", 20022), timeout=2)
+            # 手动发 HTTP 请求，完全不经过代理
+            sock.sendall(b"GET /api/health HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+            data = sock.recv(1024).decode(errors="ignore")
+            sock.close()
+            if "200" in data:
                 return True
         except Exception:
             pass
