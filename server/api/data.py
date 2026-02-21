@@ -28,33 +28,27 @@ class ImportRequest(BaseModel):
 async def import_data(req: ImportRequest):
     """Import a data file into the workarea database."""
     try:
-        db = await get_connection(req.workarea_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"无法连接数据库: {e}")
-
-    try:
-        if req.data_type == "coordinates":
-            return await _import_coordinates(db, req.file_path)
-        elif req.data_type == "trajectory":
-            return await _import_trajectory(db, req.file_path, req.well_name)
-        elif req.data_type == "curves":
-            return await _import_curves(db, req.file_path, req.well_name)
-        elif req.data_type == "layers":
-            return await _import_layers(db, req.file_path)
-        elif req.data_type == "lithology":
-            return await _import_lithology(db, req.file_path)
-        elif req.data_type == "interpretation":
-            return await _import_interpretation(db, req.file_path)
-        elif req.data_type == "discrete":
-            return await _import_discrete(db, req.file_path, req.well_name)
-        else:
-            raise HTTPException(status_code=400, detail=f"未知数据类型: {req.data_type}")
+        async with get_connection(req.workarea_path) as db:
+            if req.data_type == "coordinates":
+                return await _import_coordinates(db, req.file_path)
+            elif req.data_type == "trajectory":
+                return await _import_trajectory(db, req.file_path, req.well_name)
+            elif req.data_type == "curves":
+                return await _import_curves(db, req.file_path, req.well_name)
+            elif req.data_type == "layers":
+                return await _import_layers(db, req.file_path)
+            elif req.data_type == "lithology":
+                return await _import_lithology(db, req.file_path)
+            elif req.data_type == "interpretation":
+                return await _import_interpretation(db, req.file_path)
+            elif req.data_type == "discrete":
+                return await _import_discrete(db, req.file_path, req.well_name)
+            else:
+                raise HTTPException(status_code=400, detail=f"未知数据类型: {req.data_type}")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导入失败: {e}")
-    finally:
-        await db.close()
 
 
 async def _import_coordinates(db, file_path: str):

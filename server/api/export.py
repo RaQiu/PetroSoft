@@ -28,38 +28,32 @@ class ExportRequest(BaseModel):
 async def export_data(req: ExportRequest):
     """Export data from workarea database to a file."""
     try:
-        db = await get_connection(req.workarea_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"无法连接数据库: {e}")
+        async with get_connection(req.workarea_path) as db:
+            if req.data_type == "coordinates":
+                content = await _export_coordinates(db)
+            elif req.data_type == "trajectory":
+                content = await _export_trajectory(db, req.well_name)
+            elif req.data_type == "curves":
+                content = await _export_curves(db, req.well_name)
+            elif req.data_type == "layers":
+                content = await _export_layers(db)
+            elif req.data_type == "lithology":
+                content = await _export_lithology(db)
+            elif req.data_type == "interpretation":
+                content = await _export_interpretation(db)
+            elif req.data_type == "discrete":
+                content = await _export_discrete(db, req.well_name)
+            else:
+                raise HTTPException(status_code=400, detail=f"未知数据类型: {req.data_type}")
 
-    try:
-        if req.data_type == "coordinates":
-            content = await _export_coordinates(db)
-        elif req.data_type == "trajectory":
-            content = await _export_trajectory(db, req.well_name)
-        elif req.data_type == "curves":
-            content = await _export_curves(db, req.well_name)
-        elif req.data_type == "layers":
-            content = await _export_layers(db)
-        elif req.data_type == "lithology":
-            content = await _export_lithology(db)
-        elif req.data_type == "interpretation":
-            content = await _export_interpretation(db)
-        elif req.data_type == "discrete":
-            content = await _export_discrete(db, req.well_name)
-        else:
-            raise HTTPException(status_code=400, detail=f"未知数据类型: {req.data_type}")
+            with open(req.file_path, "w", encoding="gb2312", errors="replace") as f:
+                f.write(content)
 
-        with open(req.file_path, "w", encoding="gb2312", errors="replace") as f:
-            f.write(content)
-
-        return {"status": "ok", "message": f"导出成功: {req.file_path}"}
+            return {"status": "ok", "message": f"导出成功: {req.file_path}"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出失败: {e}")
-    finally:
-        await db.close()
 
 
 async def _export_coordinates(db):

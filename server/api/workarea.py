@@ -82,7 +82,7 @@ async def open_workarea(req: OpenWorkareaRequest):
     if not os.path.exists(db_file):
         await init_db(req.path)
 
-    async with await get_connection(req.path) as db:
+    async with get_connection(req.path) as db:
         cursor = await db.execute("SELECT COUNT(*) FROM wells")
         row = await cursor.fetchone()
         well_count = row[0]
@@ -139,7 +139,7 @@ async def save_workarea(req: OpenWorkareaRequest):
     db_file = os.path.join(req.path, "petrosoft.db")
     if not os.path.exists(db_file):
         raise HTTPException(status_code=404, detail="数据库文件不存在")
-    async with await get_connection(req.path) as db:
+    async with get_connection(req.path) as db:
         await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     return {"status": "ok", "message": "工区已保存"}
 
@@ -157,7 +157,7 @@ async def backup_workarea(req: BackupRequest):
     if not os.path.exists(db_file):
         raise HTTPException(status_code=404, detail="数据库文件不存在")
     # Checkpoint first to ensure all data is written
-    async with await get_connection(req.workarea_path) as db:
+    async with get_connection(req.workarea_path) as db:
         await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     try:
         shutil.copy2(db_file, req.backup_path)
@@ -174,7 +174,7 @@ async def clear_cache(req: OpenWorkareaRequest):
     db_file = os.path.join(req.path, "petrosoft.db")
     if not os.path.exists(db_file):
         return {"status": "ok", "message": "无需清除"}
-    async with await get_connection(req.path) as db:
+    async with get_connection(req.path) as db:
         await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     # Remove WAL and SHM files
     for ext in ["-wal", "-shm"]:

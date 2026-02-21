@@ -12,12 +12,7 @@ router = APIRouter(prefix="/well", tags=["well"])
 @router.get("/list")
 async def list_wells(workarea: str = Query(..., description="工区路径")):
     """List all wells in a workarea."""
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         cursor = await db.execute("SELECT id, name, x, y, kb, td FROM wells ORDER BY name")
         rows = await cursor.fetchall()
         wells = [
@@ -25,8 +20,6 @@ async def list_wells(workarea: str = Query(..., description="工区路径")):
             for r in rows
         ]
         return {"status": "ok", "wells": wells}
-    finally:
-        await db.close()
 
 
 @router.get("/{well_name}/curves")
@@ -34,12 +27,7 @@ async def get_well_curves(
     well_name: str, workarea: str = Query(..., description="工区路径")
 ):
     """Get list of curve names for a well."""
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         cursor = await db.execute(
             "SELECT c.id, c.name, c.unit, c.sample_interval FROM curves c "
             "JOIN wells w ON c.well_id = w.id WHERE w.name = ? ORDER BY c.name",
@@ -51,8 +39,6 @@ async def get_well_curves(
             for r in rows
         ]
         return {"status": "ok", "curves": curves}
-    finally:
-        await db.close()
 
 
 @router.get("/{well_name}/curve-data")
@@ -68,12 +54,7 @@ async def get_curve_data(
     if not curve_names:
         raise HTTPException(status_code=400, detail="请指定至少一条曲线")
 
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         result = {}
         for cname in curve_names:
             query = (
@@ -97,8 +78,6 @@ async def get_curve_data(
             result[cname] = [{"depth": r[0], "value": r[1]} for r in rows]
 
         return {"status": "ok", "data": result}
-    finally:
-        await db.close()
 
 
 @router.get("/{well_name}/layers")
@@ -106,12 +85,7 @@ async def get_well_layers(
     well_name: str, workarea: str = Query(..., description="工区路径")
 ):
     """Get layers for a well."""
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         cursor = await db.execute(
             "SELECT l.id, l.formation, l.top_depth, l.bottom_depth FROM layers l "
             "JOIN wells w ON l.well_id = w.id WHERE w.name = ? ORDER BY l.top_depth",
@@ -123,8 +97,6 @@ async def get_well_layers(
             for r in rows
         ]
         return {"status": "ok", "layers": layers}
-    finally:
-        await db.close()
 
 
 @router.get("/{well_name}/lithology")
@@ -132,12 +104,7 @@ async def get_well_lithology(
     well_name: str, workarea: str = Query(..., description="工区路径")
 ):
     """Get lithology for a well."""
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         cursor = await db.execute(
             "SELECT l.id, l.top_depth, l.bottom_depth, l.description FROM lithology l "
             "JOIN wells w ON l.well_id = w.id WHERE w.name = ? ORDER BY l.top_depth",
@@ -149,8 +116,6 @@ async def get_well_lithology(
             for r in rows
         ]
         return {"status": "ok", "lithology": entries}
-    finally:
-        await db.close()
 
 
 @router.get("/{well_name}/interpretation")
@@ -158,12 +123,7 @@ async def get_well_interpretation(
     well_name: str, workarea: str = Query(..., description="工区路径")
 ):
     """Get interpretation conclusions for a well."""
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         cursor = await db.execute(
             "SELECT i.id, i.top_depth, i.bottom_depth, i.conclusion, i.category "
             "FROM interpretations i "
@@ -182,8 +142,6 @@ async def get_well_interpretation(
             for r in rows
         ]
         return {"status": "ok", "interpretations": entries}
-    finally:
-        await db.close()
 
 
 @router.get("/{well_name}/discrete-curves")
@@ -191,12 +149,7 @@ async def get_discrete_curves(
     well_name: str, workarea: str = Query(..., description="工区路径")
 ):
     """Get discrete curve data for a well."""
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         cursor = await db.execute(
             "SELECT dc.curve_name, dc.depth, dc.value FROM discrete_curves dc "
             "JOIN wells w ON dc.well_id = w.id WHERE w.name = ? ORDER BY dc.curve_name, dc.depth",
@@ -211,8 +164,6 @@ async def get_discrete_curves(
                 grouped[cname] = []
             grouped[cname].append({"depth": r[1], "value": r[2]})
         return {"status": "ok", "discrete_curves": grouped}
-    finally:
-        await db.close()
 
 
 @router.get("/{well_name}/summary")
@@ -220,12 +171,7 @@ async def get_well_summary(
     well_name: str, workarea: str = Query(..., description="工区路径")
 ):
     """Get a summary of data available for a well."""
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         # Get well info
         cursor = await db.execute(
             "SELECT id, name, x, y, kb, td FROM wells WHERE name = ?", (well_name,)
@@ -264,8 +210,6 @@ async def get_well_summary(
             },
             "data_counts": counts,
         }
-    finally:
-        await db.close()
 
 
 @router.get("/{well_name}/query")
@@ -279,12 +223,7 @@ async def query_well_data(
     page_size: int = Query(100, ge=1, le=5000),
 ):
     """Query well curve data with pagination."""
-    try:
-        db = await get_connection(workarea)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(workarea) as db:
         # Get well
         cursor = await db.execute("SELECT id FROM wells WHERE name = ?", (well_name,))
         well_row = await cursor.fetchone()
@@ -358,5 +297,3 @@ async def query_well_data(
             "page_size": page_size,
             "total_pages": total_pages,
         }
-    finally:
-        await db.close()

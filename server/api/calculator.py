@@ -19,12 +19,7 @@ class CalculateRequest(BaseModel):
 @router.post("/{well_name}/calculate")
 async def calculate_curve(well_name: str, req: CalculateRequest):
     """Create a new curve from a mathematical expression of existing curves."""
-    try:
-        db = await get_connection(req.workarea_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(req.workarea_path) as db:
         well_id = await get_or_create_well(db, well_name)
 
         # Get all curves for this well
@@ -79,5 +74,3 @@ async def calculate_curve(well_name: str, req: CalculateRequest):
             "status": "ok",
             "message": f"计算完成: {valid_count} 个有效数据点 → 曲线 '{req.result_curve_name}'",
         }
-    finally:
-        await db.close()

@@ -4,6 +4,7 @@ Each workarea has its own .db file in the workarea directory.
 """
 
 import os
+from contextlib import asynccontextmanager
 import aiosqlite
 
 # Path to schema.sql relative to this file
@@ -25,14 +26,15 @@ async def init_db(workarea_path: str) -> None:
         await db.commit()
 
 
-async def get_connection(workarea_path: str) -> aiosqlite.Connection:
-    """Get an async database connection for a workarea."""
+@asynccontextmanager
+async def get_connection(workarea_path: str):
+    """Get an async database connection for a workarea (context manager)."""
     db_path = get_db_path(workarea_path)
-    db = await aiosqlite.connect(db_path)
-    db.row_factory = aiosqlite.Row
-    await db.execute("PRAGMA foreign_keys = ON")
-    await db.execute("PRAGMA journal_mode = WAL")
-    return db
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA foreign_keys = ON")
+        await db.execute("PRAGMA journal_mode = WAL")
+        yield db
 
 
 async def get_or_create_well(db: aiosqlite.Connection, well_name: str) -> int:

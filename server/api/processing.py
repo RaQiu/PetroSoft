@@ -28,12 +28,7 @@ class FilterRequest(BaseModel):
 @router.post("/{well_name}/resample")
 async def resample_curve(well_name: str, req: ResampleRequest):
     """Resample a curve to a new depth interval using linear interpolation."""
-    try:
-        db = await get_connection(req.workarea_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(req.workarea_path) as db:
         well_id = await get_or_create_well(db, well_name)
 
         # Get source curve data
@@ -80,19 +75,12 @@ async def resample_curve(well_name: str, req: ResampleRequest):
             "status": "ok",
             "message": f"重采样完成: {len(new_depths)} 个数据点 → 曲线 '{req.result_curve_name}'",
         }
-    finally:
-        await db.close()
 
 
 @router.post("/{well_name}/filter")
 async def filter_curve(well_name: str, req: FilterRequest):
     """Apply a filter to a curve and save as new curve."""
-    try:
-        db = await get_connection(req.workarea_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(req.workarea_path) as db:
         well_id = await get_or_create_well(db, well_name)
 
         # Get source curve data
@@ -145,8 +133,6 @@ async def filter_curve(well_name: str, req: FilterRequest):
             "status": "ok",
             "message": f"滤波完成: {len(depths)} 个数据点 → 曲线 '{req.result_curve_name}'",
         }
-    finally:
-        await db.close()
 
 
 class StandardizeRequest(BaseModel):
@@ -162,12 +148,7 @@ async def standardize_curve(well_name: str, req: StandardizeRequest):
     if req.method not in ("zscore", "minmax", "normalize"):
         raise HTTPException(status_code=400, detail=f"未知标准化方法: {req.method}")
 
-    try:
-        db = await get_connection(req.workarea_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    try:
+    async with get_connection(req.workarea_path) as db:
         well_id = await get_or_create_well(db, well_name)
 
         cursor = await db.execute(
@@ -232,5 +213,3 @@ async def standardize_curve(well_name: str, req: StandardizeRequest):
             "status": "ok",
             "message": f"{method_name}完成: {len(depths)} 个数据点 → 曲线 '{req.result_curve_name}'",
         }
-    finally:
-        await db.close()
