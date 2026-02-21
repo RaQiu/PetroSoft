@@ -191,14 +191,28 @@ async function plot() {
       return
     }
 
+    // Compute axis ranges with 5% margin based on clip range
+    const xMargin = xRange ? (xRange.max - xRange.min) * 0.05 || 0.1 : 0
+    const yMargin = yRange ? (yRange.max - yRange.min) * 0.05 || 0.1 : 0
+
     const option: Record<string, unknown> = {
       tooltip: {
         formatter: (p: { value: number[] }) =>
           `${xCurve.value}: ${p.value[0].toFixed(3)}<br/>${yCurve.value}: ${p.value[1].toFixed(3)}<br/>${colorCurve.value || '深度'}: ${p.value[2].toFixed(3)}`
       },
       grid: { left: '12%', right: '18%', top: '8%', bottom: '12%' },
-      xAxis: { type: 'value', name: xCurve.value },
-      yAxis: { type: 'value', name: yCurve.value },
+      xAxis: {
+        type: 'value',
+        name: xCurve.value,
+        min: xRange ? xRange.min - xMargin : undefined,
+        max: xRange ? xRange.max + xMargin : undefined
+      },
+      yAxis: {
+        type: 'value',
+        name: yCurve.value,
+        min: yRange ? yRange.min - yMargin : undefined,
+        max: yRange ? yRange.max + yMargin : undefined
+      },
       visualMap: {
         min: cMin,
         max: cMax,

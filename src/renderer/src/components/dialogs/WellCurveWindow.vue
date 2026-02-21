@@ -211,14 +211,23 @@ function buildChart(data: CurveDataResponse) {
     const values = validPoints.map((p) => p.value as number)
     const clipRange: ClipRange | null = computeClipRange(values, uiStore.outlierMethod)
 
+    const filteredData = validPoints
+      .filter((p) => !clipRange || (p.value! >= clipRange.min && p.value! <= clipRange.max))
+      .map((p) => [p.value, p.depth])
+
+    // Set axis range to clip range + 5% margin for better visual
+    if (clipRange && filteredData.length > 0) {
+      const margin = (clipRange.max - clipRange.min) * 0.05 || 0.1
+      xAxes[i].min = clipRange.min - margin
+      xAxes[i].max = clipRange.max + margin
+    }
+
     series.push({
       name: cname,
       type: 'line',
       xAxisIndex: i,
       yAxisIndex: i,
-      data: validPoints
-        .filter((p) => !clipRange || (p.value! >= clipRange.min && p.value! <= clipRange.max))
-        .map((p) => [p.value, p.depth]),
+      data: filteredData,
       symbol: 'none',
       lineStyle: { width: 1, color: COLORS[i % COLORS.length] },
       itemStyle: { color: COLORS[i % COLORS.length] }
