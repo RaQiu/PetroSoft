@@ -1,12 +1,17 @@
 <template>
   <div class="app-container">
     <TitleBar />
-    <MenuBar />
-    <ToolBar />
-    <MainContent />
-    <StatusBar />
+    <template v-if="workareaStore.isOpen">
+      <MenuBar />
+      <ToolBar />
+      <MainContent />
+      <StatusBar />
+    </template>
+    <template v-else>
+      <WelcomeView @create="onCreateWorkarea" @open="onOpenWorkarea" />
+    </template>
 
-    <!-- Dialogs -->
+    <!-- Dialogs (always mounted so they can be triggered) -->
     <CreateWorkareaDialog />
     <ImportFileDialog />
     <ExportFileDialog />
@@ -25,11 +30,14 @@
 </template>
 
 <script setup lang="ts">
+import { useWorkareaStore } from '@/stores/workarea'
+import { useDialogStore } from '@/stores/dialog'
 import TitleBar from '@/components/layout/TitleBar.vue'
 import MenuBar from '@/components/layout/MenuBar.vue'
 import ToolBar from '@/components/layout/ToolBar.vue'
 import MainContent from '@/components/layout/MainContent.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
+import WelcomeView from '@/views/WelcomeView.vue'
 import CreateWorkareaDialog from '@/components/dialogs/CreateWorkareaDialog.vue'
 import ImportFileDialog from '@/components/dialogs/ImportFileDialog.vue'
 import ExportFileDialog from '@/components/dialogs/ExportFileDialog.vue'
@@ -44,6 +52,17 @@ import ResampleDialog from '@/components/dialogs/ResampleDialog.vue'
 import FilterDialog from '@/components/dialogs/FilterDialog.vue'
 import CurveCalculatorDialog from '@/components/dialogs/CurveCalculatorDialog.vue'
 import StandardizeDialog from '@/components/dialogs/StandardizeDialog.vue'
+
+const workareaStore = useWorkareaStore()
+const dialogStore = useDialogStore()
+
+function onCreateWorkarea() {
+  dialogStore.showCreateWorkarea()
+}
+
+function onOpenWorkarea() {
+  workareaStore.openWorkareaFromDisk()
+}
 </script>
 
 <style scoped lang="scss">

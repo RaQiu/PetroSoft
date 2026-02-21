@@ -32,9 +32,19 @@
             <el-option v-for="c in availableCurves" :key="c.name" :label="c.name" :value="c.name" />
           </el-select>
         </div>
+        <div class="sidebar-section method-info">
+          <span>异常值: {{ currentMethodLabel }}</span>
+        </div>
         <el-button type="primary" size="small" :loading="loading" :disabled="!canPlot" @click="plot">
           绘图
         </el-button>
+        <div v-if="plotInfo" class="stats-box">
+          <div class="stats-title">绘图信息</div>
+          <div class="stats-row"><span>数据点:</span><span>{{ plotInfo.total }}</span></div>
+          <div v-if="plotInfo.removed > 0" class="stats-row removed">
+            <span>去除异常:</span><span>{{ plotInfo.removed }} 点</span>
+          </div>
+        </div>
       </div>
       <div class="crossplot-chart">
         <v-chart v-if="chartOption" :option="chartOption" autoresize style="width: 100%; height: 100%" />
@@ -58,7 +68,10 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
 import { useWellStore } from '@/stores/well'
+import { useUiStore } from '@/stores/ui'
 import { getWellCurves, getCurveData } from '@/api/well'
+import { OUTLIER_METHODS, computeClipRange } from '@/utils/outliers'
+import type { ClipRange } from '@/utils/outliers'
 import type { CurveInfo } from '@/types/well'
 
 use([ScatterChart, GridComponent, TooltipComponent, VisualMapComponent, CanvasRenderer])
@@ -66,6 +79,7 @@ use([ScatterChart, GridComponent, TooltipComponent, VisualMapComponent, CanvasRe
 const dialogStore = useDialogStore()
 const workareaStore = useWorkareaStore()
 const wellStore = useWellStore()
+const uiStore = useUiStore()
 
 const selectedWell = ref('')
 const xCurve = ref('')
@@ -74,8 +88,14 @@ const colorCurve = ref('')
 const availableCurves = ref<CurveInfo[]>([])
 const loading = ref(false)
 const chartOption = ref<Record<string, unknown> | null>(null)
+const plotInfo = ref<{ total: number; removed: number } | null>(null)
 
 const canPlot = computed(() => selectedWell.value && xCurve.value && yCurve.value)
+
+const currentMethodLabel = computed(() => {
+  const m = OUTLIER_METHODS.find((m) => m.id === uiStore.outlierMethod)
+  return m?.label ?? '不去除'
+})
 
 watch(
   () => dialogStore.crossplotVisible,
@@ -87,6 +107,7 @@ watch(
       colorCurve.value = ''
       availableCurves.value = []
       chartOption.value = null
+      plotInfo.value = null
       wellStore.fetchWells(workareaStore.path)
     }
   }
@@ -97,8 +118,14 @@ async function onWellChange(wellName: string) {
   yCurve.value = ''
   colorCurve.value = ''
   chartOption.value = null
+  plotInfo.value = null
   if (!wellName) { availableCurves.value = []; return }
   availableCurves.value = await getWellCurves(wellName, workareaStore.path)
+}
+
+function inRange(v: number, range: ClipRange | null): boolean {
+  if (!range) return true
+  return v >= range.min && v <= range.max
 }
 
 async function plot() {
@@ -115,6 +142,12 @@ async function plot() {
     const yData = data[yCurve.value] || []
     const cData = colorCurve.value ? (data[colorCurve.value] || []) : null
 
+    // Compute clip ranges using global setting
+    const xValues = xData.map((p) => p.value).filter((v): v is number => v !== null)
+    const yValues = yData.map((p) => p.value).filter((v): v is number => v !== null)
+    const xRange = computeClipRange(xValues, uiStore.outlierMethod)
+    const yRange = computeClipRange(yValues, uiStore.outlierMethod)
+
     // Build depth-indexed lookup
     const xMap = new Map(xData.map((p) => [p.depth, p.value]))
     const yMap = new Map(yData.map((p) => [p.depth, p.value]))
@@ -123,11 +156,21 @@ async function plot() {
     const allDepths = new Set([...xMap.keys(), ...yMap.keys()])
     const points: number[][] = []
     let cMin = Infinity, cMax = -Infinity
+    let totalValid = 0
+    let removedByOutlier = 0
 
     for (const d of allDepths) {
       const xv = xMap.get(d)
       const yv = yMap.get(d)
       if (xv == null || yv == null) continue
+
+      totalValid++
+
+      if (!inRange(xv, xRange) || !inRange(yv, yRange)) {
+        removedByOutlier++
+        continue
+      }
+
       if (cMap) {
         const cv = cMap.get(d)
         if (cv == null) continue
@@ -140,6 +183,8 @@ async function plot() {
         if (d > cMax) cMax = d
       }
     }
+
+    plotInfo.value = { total: totalValid, removed: removedByOutlier }
 
     if (points.length === 0) {
       chartOption.value = null
@@ -183,9 +228,17 @@ async function plot() {
 .crossplot-layout { display: flex; height: 550px; gap: 12px; }
 .crossplot-sidebar {
   width: 200px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;
-  border: 1px solid #dcdfe6; border-radius: 4px; padding: 12px;
+  border: 1px solid #dcdfe6; border-radius: 4px; padding: 12px; overflow-y: auto;
 }
 .sidebar-section { display: flex; flex-direction: column; gap: 6px; }
 .sidebar-label { font-size: 13px; font-weight: 600; color: #303133; }
+.method-info { font-size: 12px; color: #909399; }
 .crossplot-chart { flex: 1; border: 1px solid #dcdfe6; border-radius: 4px; overflow: hidden; }
+.stats-box {
+  border: 1px solid #e4e7ed; border-radius: 4px; padding: 8px; font-size: 12px;
+  background: #fafafa;
+}
+.stats-title { font-weight: 600; margin-bottom: 6px; color: #303133; }
+.stats-row { display: flex; justify-content: space-between; line-height: 1.8; color: #606266; }
+.stats-row.removed { color: #e6a23c; font-weight: 500; }
 </style>

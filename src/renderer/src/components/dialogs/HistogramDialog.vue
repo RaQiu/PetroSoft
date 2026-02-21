@@ -24,12 +24,18 @@
           <div class="sidebar-label">分箱数</div>
           <el-input-number v-model="bins" :min="5" :max="200" :step="5" style="width: 100%" />
         </div>
+        <div class="sidebar-section method-info">
+          <span>异常值: {{ currentMethodLabel }}</span>
+        </div>
         <el-button type="primary" size="small" :loading="loading" :disabled="!canPlot" @click="plot">
           绘图
         </el-button>
         <div v-if="stats" class="stats-box">
-          <div class="stats-title">统计信息</div>
+          <div class="stats-title">统计信息{{ uiStore.outlierMethod !== 'none' ? '（去异常后）' : '' }}</div>
           <div class="stats-row"><span>数据量:</span><span>{{ stats.count }}</span></div>
+          <div v-if="removedCount > 0" class="stats-row removed">
+            <span>去除:</span><span>{{ removedCount }} 个异常值</span>
+          </div>
           <div class="stats-row"><span>均值:</span><span>{{ stats.mean.toFixed(4) }}</span></div>
           <div class="stats-row"><span>中位数:</span><span>{{ stats.median.toFixed(4) }}</span></div>
           <div class="stats-row"><span>标准差:</span><span>{{ stats.stdDev.toFixed(4) }}</span></div>
@@ -59,8 +65,10 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
 import { useWellStore } from '@/stores/well'
+import { useUiStore } from '@/stores/ui'
 import { getWellCurves, getCurveData } from '@/api/well'
 import { computeHistogram, computeStats } from '@/utils/statistics'
+import { OUTLIER_METHODS, computeClipRange, clipValues } from '@/utils/outliers'
 import type { CurveInfo } from '@/types/well'
 import type { StatsResult } from '@/utils/statistics'
 
@@ -69,6 +77,7 @@ use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
 const dialogStore = useDialogStore()
 const workareaStore = useWorkareaStore()
 const wellStore = useWellStore()
+const uiStore = useUiStore()
 
 const selectedWell = ref('')
 const selectedCurve = ref('')
@@ -77,8 +86,14 @@ const bins = ref(30)
 const loading = ref(false)
 const chartOption = ref<Record<string, unknown> | null>(null)
 const stats = ref<StatsResult | null>(null)
+const removedCount = ref(0)
 
 const canPlot = computed(() => selectedWell.value && selectedCurve.value)
+
+const currentMethodLabel = computed(() => {
+  const m = OUTLIER_METHODS.find((m) => m.id === uiStore.outlierMethod)
+  return m?.label ?? '不去除'
+})
 
 watch(
   () => dialogStore.histogramVisible,
@@ -89,6 +104,7 @@ watch(
       availableCurves.value = []
       chartOption.value = null
       stats.value = null
+      removedCount.value = 0
       bins.value = 30
       wellStore.fetchWells(workareaStore.path)
     }
@@ -99,6 +115,7 @@ async function onWellChange(wellName: string) {
   selectedCurve.value = ''
   chartOption.value = null
   stats.value = null
+  removedCount.value = 0
   if (!wellName) { availableCurves.value = []; return }
   availableCurves.value = await getWellCurves(wellName, workareaStore.path)
 }
@@ -109,7 +126,19 @@ async function plot() {
   try {
     const data = await getCurveData(selectedWell.value, workareaStore.path, [selectedCurve.value])
     const points = data[selectedCurve.value] || []
-    const values = points.map((p) => p.value).filter((v): v is number => v !== null)
+    const rawValues = points.map((p) => p.value).filter((v): v is number => v !== null)
+
+    if (rawValues.length === 0) {
+      chartOption.value = null
+      stats.value = null
+      removedCount.value = 0
+      return
+    }
+
+    // Apply global outlier removal setting
+    const range = computeClipRange(rawValues, uiStore.outlierMethod)
+    const values = clipValues(rawValues, range)
+    removedCount.value = rawValues.length - values.length
 
     if (values.length === 0) {
       chartOption.value = null
@@ -152,6 +181,7 @@ async function plot() {
 }
 .sidebar-section { display: flex; flex-direction: column; gap: 6px; }
 .sidebar-label { font-size: 13px; font-weight: 600; color: #303133; }
+.method-info { font-size: 12px; color: #909399; }
 .histogram-chart { flex: 1; border: 1px solid #dcdfe6; border-radius: 4px; overflow: hidden; }
 .stats-box {
   border: 1px solid #e4e7ed; border-radius: 4px; padding: 8px; font-size: 12px;
@@ -159,4 +189,5 @@ async function plot() {
 }
 .stats-title { font-weight: 600; margin-bottom: 6px; color: #303133; }
 .stats-row { display: flex; justify-content: space-between; line-height: 1.8; color: #606266; }
+.stats-row.removed { color: #e6a23c; font-weight: 500; }
 </style>

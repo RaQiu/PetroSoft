@@ -38,6 +38,9 @@
         <el-button type="primary" size="small" :loading="loadingData" :disabled="!canPlot" @click="loadAndPlot">
           绘制曲线
         </el-button>
+        <div class="method-info">
+          <span>异常值: {{ currentMethodLabel }}</span>
+        </div>
       </div>
       <div class="curve-chart-area">
         <v-chart
@@ -69,7 +72,10 @@ import type { GridComponentOption, TooltipComponentOption, LegendComponentOption
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
 import { useWellStore } from '@/stores/well'
+import { useUiStore } from '@/stores/ui'
 import { getWellCurves, getCurveData } from '@/api/well'
+import { OUTLIER_METHODS, computeClipRange } from '@/utils/outliers'
+import type { ClipRange } from '@/utils/outliers'
 import type { CurveInfo, CurveDataResponse } from '@/types/well'
 
 use([LineChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent, CanvasRenderer])
@@ -81,6 +87,7 @@ type ECOption = ComposeOption<
 const dialogStore = useDialogStore()
 const workareaStore = useWorkareaStore()
 const wellStore = useWellStore()
+const uiStore = useUiStore()
 
 const selectedWellName = ref('')
 const availableCurves = ref<CurveInfo[]>([])
@@ -89,6 +96,11 @@ const loadingData = ref(false)
 const chartOption = ref<ECOption | null>(null)
 
 const canPlot = computed(() => selectedWellName.value && selectedCurves.value.length > 0)
+
+const currentMethodLabel = computed(() => {
+  const m = OUTLIER_METHODS.find((m) => m.id === uiStore.outlierMethod)
+  return m?.label ?? '不去除'
+})
 
 watch(
   () => dialogStore.wellCurveVisible,
@@ -195,13 +207,17 @@ function buildChart(data: CurveDataResponse) {
     })
 
     const points = data[cname] || []
+    const validPoints = points.filter((p) => p.value !== null)
+    const values = validPoints.map((p) => p.value as number)
+    const clipRange: ClipRange | null = computeClipRange(values, uiStore.outlierMethod)
+
     series.push({
       name: cname,
       type: 'line',
       xAxisIndex: i,
       yAxisIndex: i,
-      data: points
-        .filter((p) => p.value !== null)
+      data: validPoints
+        .filter((p) => !clipRange || (p.value! >= clipRange.min && p.value! <= clipRange.max))
         .map((p) => [p.value, p.depth]),
       symbol: 'none',
       lineStyle: { width: 1, color: COLORS[i % COLORS.length] },
@@ -276,6 +292,11 @@ function buildChart(data: CurveDataResponse) {
   font-size: 13px;
   font-weight: 600;
   color: #303133;
+}
+
+.method-info {
+  font-size: 12px;
+  color: #909399;
 }
 
 .el-checkbox-group {

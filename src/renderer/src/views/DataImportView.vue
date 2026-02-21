@@ -7,6 +7,20 @@
         <el-option label="曲线" value="curve" />
         <el-option label="分层/岩性/解释" value="geo" />
       </el-select>
+      <div class="header-separator" />
+      <span class="header-label">异常值处理:</span>
+      <el-select v-model="uiStore.outlierMethod" style="width: 180px" size="small">
+        <el-option
+          v-for="m in OUTLIER_METHODS"
+          :key="m.id"
+          :label="m.label"
+          :value="m.id"
+        />
+      </el-select>
+      <el-tooltip :content="currentMethodDesc" placement="bottom">
+        <el-icon style="color: #909399; cursor: help"><QuestionFilled /></el-icon>
+      </el-tooltip>
+      <div class="header-spacer" />
       <el-button type="primary" size="small" :icon="Plus" @click="onImportClick">导入数据</el-button>
       <el-button size="small" :icon="Refresh" @click="loadData">刷新</el-button>
     </div>
@@ -27,12 +41,14 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, Refresh, QuestionFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
 import { useWellStore } from '@/stores/well'
+import { useUiStore } from '@/stores/ui'
 import { getWellSummary } from '@/api/well'
+import { OUTLIER_METHODS } from '@/utils/outliers'
 
 interface DataRow {
   wellName: string
@@ -44,10 +60,16 @@ interface DataRow {
 const dialogStore = useDialogStore()
 const workareaStore = useWorkareaStore()
 const wellStore = useWellStore()
+const uiStore = useUiStore()
 
 const filterType = ref('all')
 const loading = ref(false)
 const tableData = ref<DataRow[]>([])
+
+const currentMethodDesc = computed(() => {
+  const m = OUTLIER_METHODS.find((m) => m.id === uiStore.outlierMethod)
+  return m?.description ?? ''
+})
 
 const filteredData = computed(() => {
   if (filterType.value === 'all') return tableData.value
@@ -175,6 +197,23 @@ function onImportClick() {
 .view-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+}
+
+.header-label {
+  font-size: 13px;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.header-separator {
+  width: 1px;
+  height: 20px;
+  background: #dcdfe6;
+  margin: 0 4px;
+}
+
+.header-spacer {
+  flex: 1;
 }
 </style>
