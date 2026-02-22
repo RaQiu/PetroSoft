@@ -9,6 +9,12 @@ from api.export import router as export_router
 from api.well import router as well_router
 from api.processing import router as processing_router
 from api.calculator import router as calculator_router
+from api.seismic import router as seismic_router
+from api.rock_physics import router as rock_physics_router
+from api.tag import router as tag_router
+from api.task import router as task_router
+from api.chart import router as chart_router
+from api.horizon import router as horizon_router
 
 app = FastAPI(title="PetroSoft API", version="1.0.0")
 
@@ -27,3 +33,9 @@ app.include_router(export_router, prefix="/api")
 app.include_router(well_router, prefix="/api")
 app.include_router(processing_router, prefix="/api")
 app.include_router(calculator_router, prefix="/api")
+app.include_router(seismic_router, prefix="/api")
+app.include_router(rock_physics_router, prefix="/api")
+app.include_router(tag_router, prefix="/api")
+app.include_router(task_router, prefix="/api")
+app.include_router(chart_router, prefix="/api")
+app.include_router(horizon_router, prefix="/api")

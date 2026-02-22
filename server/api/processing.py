@@ -213,3 +213,185 @@ async def standardize_curve(well_name: str, req: StandardizeRequest):
             "status": "ok",
             "message": f"{method_name}完成: {len(depths)} 个数据点 → 曲线 '{req.result_curve_name}'",
         }
+
+
+class OutlierRequest(BaseModel):
+    workarea_path: str
+    curve_name: str
+    method: str  # "iqr", "iqr3", "sigma2", "sigma3", "percentile", "mad"
+    action: str  # "null" or "clip"
+    result_curve_name: str
+
+
+@router.post("/{well_name}/outlier")
+async def remove_outliers(well_name: str, req: OutlierRequest):
+    """Detect and remove outliers from a curve."""
+    import math
+
+    valid_methods = ("iqr", "iqr3", "sigma2", "sigma3", "percentile", "mad")
+    if req.method not in valid_methods:
+        raise HTTPException(status_code=400, detail=f"未知异常值方法: {req.method}")
+    if req.action not in ("null", "clip"):
+        raise HTTPException(status_code=400, detail=f"未知处理方式: {req.action}")
+
+    async with get_connection(req.workarea_path) as db:
+        well_id = await get_or_create_well(db, well_name)
+
+        cursor = await db.execute(
+            "SELECT c.id, c.sample_interval FROM curves c WHERE c.well_id = ? AND c.name = ?",
+            (well_id, req.curve_name),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"曲线 '{req.curve_name}' 不存在")
+        src_curve_id = row[0]
+        sample_interval = row[1]
+
+        cursor = await db.execute(
+            "SELECT depth, value FROM curve_data WHERE curve_id = ? ORDER BY depth",
+            (src_curve_id,),
+        )
+        rows = await cursor.fetchall()
+        depths = [r[0] for r in rows]
+        values = [r[1] for r in rows]
+
+        valid = [v for v in values if v is not None]
+        if len(valid) < 4:
+            raise HTTPException(status_code=400, detail="有效数据点不足，无法进行异常值检测")
+
+        sorted_valid = sorted(valid)
+
+        def quantile_val(arr, q):
+            pos = (len(arr) - 1) * q
+            lo = int(pos)
+            hi = min(lo + 1, len(arr) - 1)
+            return arr[lo] + (arr[hi] - arr[lo]) * (pos - lo)
+
+        # Compute clip range
+        if req.method in ("iqr", "iqr3"):
+            k = 1.5 if req.method == "iqr" else 3.0
+            q1 = quantile_val(sorted_valid, 0.25)
+            q3 = quantile_val(sorted_valid, 0.75)
+            iqr = q3 - q1
+            clip_min, clip_max = q1 - k * iqr, q3 + k * iqr
+        elif req.method == "percentile":
+            clip_min = quantile_val(sorted_valid, 0.01)
+            clip_max = quantile_val(sorted_valid, 0.99)
+        elif req.method in ("sigma2", "sigma3"):
+            n = 2.0 if req.method == "sigma2" else 3.0
+            avg = sum(valid) / len(valid)
+            sd = (sum((v - avg) ** 2 for v in valid) / len(valid)) ** 0.5
+            clip_min, clip_max = avg - n * sd, avg + n * sd
+        elif req.method == "mad":
+            n = len(sorted_valid)
+            med = (sorted_valid[n // 2 - 1] + sorted_valid[n // 2]) / 2 if n % 2 == 0 else sorted_valid[n // 2]
+            abs_devs = sorted(abs(v - med) for v in sorted_valid)
+            mad_val = (abs_devs[n // 2 - 1] + abs_devs[n // 2]) / 2 if n % 2 == 0 else abs_devs[n // 2]
+            threshold = 3 * 1.4826 * mad_val
+            clip_min, clip_max = med - threshold, med + threshold
+
+        # Apply action
+        removed = 0
+        result = []
+        for v in values:
+            if v is None:
+                result.append(None)
+            elif v < clip_min or v > clip_max:
+                removed += 1
+                if req.action == "null":
+                    result.append(None)
+                else:  # clip
+                    result.append(max(clip_min, min(clip_max, v)))
+            else:
+                result.append(v)
+
+        method_labels = {
+            "iqr": "IQR", "iqr3": "IQR x3", "sigma2": "2-Sigma",
+            "sigma3": "3-Sigma", "percentile": "百分位截断", "mad": "MAD"
+        }
+
+        # Save result
+        await db.execute(
+            """INSERT INTO curves (well_id, name, unit, sample_interval) VALUES (?, ?, '', ?)
+               ON CONFLICT(well_id, name) DO UPDATE SET sample_interval=?""",
+            (well_id, req.result_curve_name, sample_interval, sample_interval),
+        )
+        cursor = await db.execute(
+            "SELECT id FROM curves WHERE well_id = ? AND name = ?",
+            (well_id, req.result_curve_name),
+        )
+        new_curve_id = (await cursor.fetchone())[0]
+
+        await db.execute("DELETE FROM curve_data WHERE curve_id = ?", (new_curve_id,))
+        batch = [(new_curve_id, d, v) for d, v in zip(depths, result)]
+        await db.executemany(
+            "INSERT INTO curve_data (curve_id, depth, value) VALUES (?, ?, ?)", batch
+        )
+        await db.commit()
+
+        return {
+            "status": "ok",
+            "message": f"{method_labels[req.method]}异常值处理完成: 去除 {removed} 个异常值 → 曲线 '{req.result_curve_name}'",
+        }
+
+
+class BaselineRequest(BaseModel):
+    workarea_path: str
+    curve_name: str
+    result_curve_name: str
+
+
+@router.post("/{well_name}/baseline")
+async def baseline_correction(well_name: str, req: BaselineRequest):
+    """Apply baseline correction (subtract mean) to a curve."""
+    async with get_connection(req.workarea_path) as db:
+        well_id = await get_or_create_well(db, well_name)
+
+        cursor = await db.execute(
+            "SELECT c.id, c.sample_interval FROM curves c WHERE c.well_id = ? AND c.name = ?",
+            (well_id, req.curve_name),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"曲线 '{req.curve_name}' 不存在")
+        src_curve_id = row[0]
+        sample_interval = row[1]
+
+        cursor = await db.execute(
+            "SELECT depth, value FROM curve_data WHERE curve_id = ? ORDER BY depth",
+            (src_curve_id,),
+        )
+        rows = await cursor.fetchall()
+        depths = [r[0] for r in rows]
+        values = [r[1] for r in rows]
+
+        valid = [v for v in values if v is not None]
+        if len(valid) == 0:
+            raise HTTPException(status_code=400, detail="曲线数据为空")
+
+        baseline = sum(valid) / len(valid)
+        result = [(v - baseline) if v is not None else None for v in values]
+
+        # Save result
+        await db.execute(
+            """INSERT INTO curves (well_id, name, unit, sample_interval) VALUES (?, ?, '', ?)
+               ON CONFLICT(well_id, name) DO UPDATE SET sample_interval=?""",
+            (well_id, req.result_curve_name, sample_interval, sample_interval),
+        )
+        cursor = await db.execute(
+            "SELECT id FROM curves WHERE well_id = ? AND name = ?",
+            (well_id, req.result_curve_name),
+        )
+        new_curve_id = (await cursor.fetchone())[0]
+
+        await db.execute("DELETE FROM curve_data WHERE curve_id = ?", (new_curve_id,))
+        batch = [(new_curve_id, d, v) for d, v in zip(depths, result)]
+        await db.executemany(
+            "INSERT INTO curve_data (curve_id, depth, value) VALUES (?, ?, ?)", batch
+        )
+        await db.commit()
+
+        return {
+            "status": "ok",
+            "message": f"基线校正完成: 均值 {baseline:.4f} 已去除 → 曲线 '{req.result_curve_name}'",
+        }

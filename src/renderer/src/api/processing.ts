@@ -45,3 +45,33 @@ export async function standardizeCurve(
   const res = await apiClient.post(`/well/${encodeURIComponent(wellName)}/standardize`, params)
   return res.data
 }
+
+export interface OutlierParams {
+  workarea_path: string
+  curve_name: string
+  method: string
+  action: string
+  result_curve_name: string
+}
+
+export async function removeOutliers(
+  wellName: string,
+  params: OutlierParams
+): Promise<{ message: string }> {
+  const res = await apiClient.post(`/well/${encodeURIComponent(wellName)}/outlier`, params)
+  return res.data
+}
+
+export interface BaselineParams {
+  workarea_path: string
+  curve_name: string
+  result_curve_name: string
+}
+
+export async function baselineCorrection(
+  wellName: string,
+  params: BaselineParams
+): Promise<{ message: string }> {
+  const res = await apiClient.post(`/well/${encodeURIComponent(wellName)}/baseline`, params)
+  return res.data
+}

@@ -60,6 +60,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
@@ -152,6 +153,7 @@ async function loadAndPlot() {
     buildChart(data)
   } catch {
     chartOption.value = null
+    ElMessage.warning('加载曲线数据失败')
   } finally {
     loadingData.value = false
   }

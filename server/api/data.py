@@ -12,6 +12,8 @@ from parsers import (
     parse_lithology,
     parse_interpretation,
     parse_discrete_curves,
+    parse_time_depth,
+    parse_well_attributes,
 )
 
 router = APIRouter(prefix="/data", tags=["data"])
@@ -43,6 +45,10 @@ async def import_data(req: ImportRequest):
                 return await _import_interpretation(db, req.file_path)
             elif req.data_type == "discrete":
                 return await _import_discrete(db, req.file_path, req.well_name)
+            elif req.data_type == "time_depth":
+                return await _import_time_depth(db, req.file_path)
+            elif req.data_type == "well_attribute":
+                return await _import_well_attributes(db, req.file_path)
             else:
                 raise HTTPException(status_code=400, detail=f"未知数据类型: {req.data_type}")
     except HTTPException:
@@ -175,3 +181,34 @@ async def _import_discrete(db, file_path: str, well_name: str):
         )
     await db.commit()
     return {"status": "ok", "message": f"成功导入 {len(points)} 条离散曲线 '{curve_name}' 数据"}
+
+
+async def _import_time_depth(db, file_path: str):
+    entries = parse_time_depth(file_path)
+    count = 0
+    for e in entries:
+        well_id = await get_or_create_well(db, e.well_name)
+        await db.execute(
+            "INSERT INTO time_depth (well_id, depth, time) VALUES (?, ?, ?)",
+            (well_id, e.depth, e.time),
+        )
+        count += 1
+    await db.commit()
+    return {"status": "ok", "message": f"成功导入 {count} 条时深数据"}
+
+
+async def _import_well_attributes(db, file_path: str):
+    attrs = parse_well_attributes(file_path)
+    count = 0
+    for a in attrs:
+        well_id = await get_or_create_well(db, a.well_name)
+        await db.execute(
+            """INSERT INTO well_attributes (well_id, attribute_name, attribute_value) VALUES (?, ?, ?)
+               ON CONFLICT DO NOTHING""",
+            (well_id, a.attribute_name, a.attribute_value),
+        )
+        count += 1
+    await db.commit()
+    wells_count = len(set(a.well_name for a in attrs))
+    attr_count = len(set(a.attribute_name for a in attrs))
+    return {"status": "ok", "message": f"成功导入 {wells_count} 口井 {attr_count} 个属性"}

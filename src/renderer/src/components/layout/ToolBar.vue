@@ -45,6 +45,12 @@ function onToolClick(item: ToolBarItem) {
     case 'tb-crossplot':
       requireWorkarea(() => dialogStore.showCrossplot())
       break
+    case 'tb-section':
+      requireWorkarea(() => dialogStore.showSeismicDisplay())
+      break
+    case 'tb-basemap':
+      requireWorkarea(() => dialogStore.showBasemap())
+      break
     default:
       ElMessage.info(`「${item.label}」功能开发中...`)
   }

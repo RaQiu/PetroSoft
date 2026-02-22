@@ -56,5 +56,7 @@ export const DATA_TYPES: DataTypeOption[] = [
   { label: '分层', value: 'layers', needsWellName: false },
   { label: '岩性', value: 'lithology', needsWellName: false },
   { label: '解释结论', value: 'interpretation', needsWellName: false },
-  { label: '离散曲线', value: 'discrete', needsWellName: true }
+  { label: '离散曲线', value: 'discrete', needsWellName: true },
+  { label: '时深关系', value: 'time_depth', needsWellName: false },
+  { label: '井点属性', value: 'well_attribute', needsWellName: false }
 ]

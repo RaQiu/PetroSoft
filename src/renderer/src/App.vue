@@ -26,12 +26,38 @@
     <FilterDialog />
     <CurveCalculatorDialog />
     <StandardizeDialog />
+    <SegyBrowseDialog />
+    <SeismicImportDialog />
+    <SeismicDisplayDialog />
+    <BasemapDialog />
+    <OutlierDialog />
+    <BaselineDialog />
+    <ReservoirParamsDialog />
+    <VshCalcDialog />
+    <PorosityCalcDialog />
+    <TotalPorosityDialog />
+    <SWavePredictDialog />
+    <ElasticCalcDialog />
+    <FluidSubDialog />
+    <VpCorrectionDialog />
+    <DensityCorrectionDialog />
+    <CurveReconstructDialog />
+    <AdaptiveModelDialog />
+    <SandShaleModelDialog />
+    <ElasticImpedanceDialog />
+    <FluidSubSimplifiedDialog />
     <QuickCalibrationDialog />
     <VelocityModelingDialog />
     <VelocityConversionDialog />
     <TDConvertVolumeDialog />
     <TDConvertHorizonDialog />
     <TDConvertFaultDialog />
+    <HorizonFromTopsDialog />
+    <HorizonSmoothDialog />
+    <HorizonCalcDialog />
+    <HorizonInterpolateDialog />
+    <HorizonMergeDialog />
+    <HorizonDecimateDialog />
   </div>
 </template>
 
@@ -58,12 +84,38 @@ import ResampleDialog from '@/components/dialogs/ResampleDialog.vue'
 import FilterDialog from '@/components/dialogs/FilterDialog.vue'
 import CurveCalculatorDialog from '@/components/dialogs/CurveCalculatorDialog.vue'
 import StandardizeDialog from '@/components/dialogs/StandardizeDialog.vue'
+import SegyBrowseDialog from '@/components/dialogs/SegyBrowseDialog.vue'
+import SeismicImportDialog from '@/components/dialogs/SeismicImportDialog.vue'
+import SeismicDisplayDialog from '@/components/dialogs/SeismicDisplayDialog.vue'
+import BasemapDialog from '@/components/dialogs/BasemapDialog.vue'
+import OutlierDialog from '@/components/dialogs/OutlierDialog.vue'
+import BaselineDialog from '@/components/dialogs/BaselineDialog.vue'
+import ReservoirParamsDialog from '@/components/dialogs/ReservoirParamsDialog.vue'
+import VshCalcDialog from '@/components/dialogs/VshCalcDialog.vue'
+import PorosityCalcDialog from '@/components/dialogs/PorosityCalcDialog.vue'
+import TotalPorosityDialog from '@/components/dialogs/TotalPorosityDialog.vue'
+import SWavePredictDialog from '@/components/dialogs/SWavePredictDialog.vue'
+import ElasticCalcDialog from '@/components/dialogs/ElasticCalcDialog.vue'
+import FluidSubDialog from '@/components/dialogs/FluidSubDialog.vue'
+import VpCorrectionDialog from '@/components/dialogs/VpCorrectionDialog.vue'
+import DensityCorrectionDialog from '@/components/dialogs/DensityCorrectionDialog.vue'
+import CurveReconstructDialog from '@/components/dialogs/CurveReconstructDialog.vue'
+import AdaptiveModelDialog from '@/components/dialogs/AdaptiveModelDialog.vue'
+import SandShaleModelDialog from '@/components/dialogs/SandShaleModelDialog.vue'
+import ElasticImpedanceDialog from '@/components/dialogs/ElasticImpedanceDialog.vue'
+import FluidSubSimplifiedDialog from '@/components/dialogs/FluidSubSimplifiedDialog.vue'
 import QuickCalibrationDialog from '@/components/dialogs/QuickCalibrationDialog.vue'
 import VelocityModelingDialog from '@/components/dialogs/VelocityModelingDialog.vue'
 import VelocityConversionDialog from '@/components/dialogs/VelocityConversionDialog.vue'
 import TDConvertVolumeDialog from '@/components/dialogs/TDConvertVolumeDialog.vue'
 import TDConvertHorizonDialog from '@/components/dialogs/TDConvertHorizonDialog.vue'
 import TDConvertFaultDialog from '@/components/dialogs/TDConvertFaultDialog.vue'
+import HorizonFromTopsDialog from '@/components/dialogs/HorizonFromTopsDialog.vue'
+import HorizonSmoothDialog from '@/components/dialogs/HorizonSmoothDialog.vue'
+import HorizonCalcDialog from '@/components/dialogs/HorizonCalcDialog.vue'
+import HorizonInterpolateDialog from '@/components/dialogs/HorizonInterpolateDialog.vue'
+import HorizonMergeDialog from '@/components/dialogs/HorizonMergeDialog.vue'
+import HorizonDecimateDialog from '@/components/dialogs/HorizonDecimateDialog.vue'
 
 const workareaStore = useWorkareaStore()
 const dialogStore = useDialogStore()

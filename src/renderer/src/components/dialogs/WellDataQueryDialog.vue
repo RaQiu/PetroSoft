@@ -25,7 +25,7 @@
         :prop="col"
         :label="col"
         :width="col === '深度' ? 120 : undefined"
-        :formatter="(_, __, val) => val != null ? Number(val).toFixed(3) : '-9999'"
+        :formatter="(_, __, val) => val != null ? Number(val).toFixed(3) : '—'"
       />
     </el-table>
     <div class="query-pagination">
@@ -45,6 +45,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
 import { useWellStore } from '@/stores/well'
@@ -119,6 +120,7 @@ async function query() {
     columns.value = []
     tableData.value = []
     total.value = 0
+    ElMessage.warning('查询数据失败')
   } finally {
     loading.value = false
   }

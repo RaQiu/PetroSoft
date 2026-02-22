@@ -87,3 +87,21 @@ def format_discrete(curve_name: str, points: list[dict]) -> str:
         val = f"{p['value']:.3f}" if p['value'] is not None else "-9999.000"
         lines.append(f"\t{p['depth']:.3f}\t{val}")
     return "\n".join(lines) + "\n"
+
+
+def format_time_depth(entries: list[dict]) -> str:
+    lines = ["井名\t深度\t时间"]
+    for e in entries:
+        depth = f"{e['depth']:.2f}" if e['depth'] is not None else "0.00"
+        time_val = f"{e['time']:.2f}" if e['time'] is not None else "0.00"
+        lines.append(f"{e['well_name']}\t{depth}\t{time_val}")
+    return "\n".join(lines) + "\n"
+
+
+def format_well_attributes(attr_names: list[str], wells_data: list[dict]) -> str:
+    header = "井名\t" + "\t".join(attr_names)
+    lines = [header]
+    for wd in wells_data:
+        vals = [wd.get(an, "") for an in attr_names]
+        lines.append(f"{wd['well_name']}\t" + "\t".join(vals))
+    return "\n".join(lines) + "\n"

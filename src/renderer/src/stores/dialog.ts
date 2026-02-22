@@ -16,12 +16,38 @@ export const useDialogStore = defineStore('dialog', () => {
   const filterVisible = ref(false)
   const curveCalculatorVisible = ref(false)
   const standardizeVisible = ref(false)
+  const segyBrowseVisible = ref(false)
+  const seismicImportVisible = ref(false)
+  const seismicDisplayVisible = ref(false)
+  const basemapVisible = ref(false)
+  const outlierVisible = ref(false)
+  const baselineVisible = ref(false)
+  const reservoirParamsVisible = ref(false)
+  const vshCalcVisible = ref(false)
+  const porosityCalcVisible = ref(false)
+  const totalPorosityVisible = ref(false)
+  const sWavePredictVisible = ref(false)
+  const elasticCalcVisible = ref(false)
+  const fluidSubVisible = ref(false)
+  const vpCorrectionVisible = ref(false)
+  const densityCorrectionVisible = ref(false)
+  const curveReconstructVisible = ref(false)
+  const adaptiveModelVisible = ref(false)
+  const sandShaleModelVisible = ref(false)
+  const elasticImpedanceVisible = ref(false)
+  const fluidSubSimplifiedVisible = ref(false)
   const quickCalibrationVisible = ref(false)
   const velocityModelingVisible = ref(false)
   const velocityConversionVisible = ref(false)
   const tdConvertVolumeVisible = ref(false)
   const tdConvertHorizonVisible = ref(false)
   const tdConvertFaultVisible = ref(false)
+  const horizonFromTopsVisible = ref(false)
+  const horizonSmoothVisible = ref(false)
+  const horizonCalcVisible = ref(false)
+  const horizonInterpolateVisible = ref(false)
+  const horizonMergeVisible = ref(false)
+  const horizonDecimateVisible = ref(false)
 
   // Pre-set data type for import/export dialog
   const importPresetType = ref('')
@@ -32,6 +58,9 @@ export const useDialogStore = defineStore('dialog', () => {
 
   // Pre-set for standardize dialog
   const standardizePresetMethod = ref('')
+
+  // Pre-set for reservoir params dialog
+  const reservoirParamsPresetType = ref('')
 
   function showCreateWorkarea() {
     createWorkareaVisible.value = true
@@ -97,6 +126,87 @@ export const useDialogStore = defineStore('dialog', () => {
     standardizeVisible.value = true
   }
 
+  function showSegyBrowse() {
+    segyBrowseVisible.value = true
+  }
+
+  function showSeismicImport() {
+    seismicImportVisible.value = true
+  }
+
+  function showSeismicDisplay() {
+    seismicDisplayVisible.value = true
+  }
+
+  function showBasemap() {
+    basemapVisible.value = true
+  }
+
+  function showOutlier() {
+    outlierVisible.value = true
+  }
+
+  function showBaseline() {
+    baselineVisible.value = true
+  }
+
+  function showReservoirParams(presetType = '') {
+    reservoirParamsPresetType.value = presetType
+    reservoirParamsVisible.value = true
+  }
+
+  function showVshCalc() {
+    vshCalcVisible.value = true
+  }
+
+  function showPorosityCalc() {
+    porosityCalcVisible.value = true
+  }
+
+  function showTotalPorosity() {
+    totalPorosityVisible.value = true
+  }
+
+  function showSWavePredict() {
+    sWavePredictVisible.value = true
+  }
+
+  function showElasticCalc() {
+    elasticCalcVisible.value = true
+  }
+
+  function showFluidSub() {
+    fluidSubVisible.value = true
+  }
+
+  function showVpCorrection() {
+    vpCorrectionVisible.value = true
+  }
+
+  function showDensityCorrection() {
+    densityCorrectionVisible.value = true
+  }
+
+  function showCurveReconstruct() {
+    curveReconstructVisible.value = true
+  }
+
+  function showAdaptiveModel() {
+    adaptiveModelVisible.value = true
+  }
+
+  function showSandShaleModel() {
+    sandShaleModelVisible.value = true
+  }
+
+  function showElasticImpedance() {
+    elasticImpedanceVisible.value = true
+  }
+
+  function showFluidSubSimplified() {
+    fluidSubSimplifiedVisible.value = true
+  }
+
   function showQuickCalibration() {
     quickCalibrationVisible.value = true
   }
@@ -121,6 +231,30 @@ export const useDialogStore = defineStore('dialog', () => {
     tdConvertFaultVisible.value = true
   }
 
+  function showHorizonFromTops() {
+    horizonFromTopsVisible.value = true
+  }
+
+  function showHorizonSmooth() {
+    horizonSmoothVisible.value = true
+  }
+
+  function showHorizonCalc() {
+    horizonCalcVisible.value = true
+  }
+
+  function showHorizonInterpolate() {
+    horizonInterpolateVisible.value = true
+  }
+
+  function showHorizonMerge() {
+    horizonMergeVisible.value = true
+  }
+
+  function showHorizonDecimate() {
+    horizonDecimateVisible.value = true
+  }
+
   function closeAllDialogs() {
     createWorkareaVisible.value = false
     importFileVisible.value = false
@@ -136,12 +270,38 @@ export const useDialogStore = defineStore('dialog', () => {
     filterVisible.value = false
     curveCalculatorVisible.value = false
     standardizeVisible.value = false
+    segyBrowseVisible.value = false
+    seismicImportVisible.value = false
+    seismicDisplayVisible.value = false
+    basemapVisible.value = false
+    outlierVisible.value = false
+    baselineVisible.value = false
+    reservoirParamsVisible.value = false
+    vshCalcVisible.value = false
+    porosityCalcVisible.value = false
+    totalPorosityVisible.value = false
+    sWavePredictVisible.value = false
+    elasticCalcVisible.value = false
+    fluidSubVisible.value = false
+    vpCorrectionVisible.value = false
+    densityCorrectionVisible.value = false
+    curveReconstructVisible.value = false
+    adaptiveModelVisible.value = false
+    sandShaleModelVisible.value = false
+    elasticImpedanceVisible.value = false
+    fluidSubSimplifiedVisible.value = false
     quickCalibrationVisible.value = false
     velocityModelingVisible.value = false
     velocityConversionVisible.value = false
     tdConvertVolumeVisible.value = false
     tdConvertHorizonVisible.value = false
     tdConvertFaultVisible.value = false
+    horizonFromTopsVisible.value = false
+    horizonSmoothVisible.value = false
+    horizonCalcVisible.value = false
+    horizonInterpolateVisible.value = false
+    horizonMergeVisible.value = false
+    horizonDecimateVisible.value = false
   }
 
   return {
@@ -159,16 +319,43 @@ export const useDialogStore = defineStore('dialog', () => {
     filterVisible,
     curveCalculatorVisible,
     standardizeVisible,
-    importPresetType,
-    exportPresetType,
-    curveCalculatorPreset,
-    standardizePresetMethod,
+    segyBrowseVisible,
+    seismicImportVisible,
+    seismicDisplayVisible,
+    basemapVisible,
+    outlierVisible,
+    baselineVisible,
+    reservoirParamsVisible,
+    vshCalcVisible,
+    porosityCalcVisible,
+    totalPorosityVisible,
+    sWavePredictVisible,
+    elasticCalcVisible,
+    fluidSubVisible,
+    vpCorrectionVisible,
+    densityCorrectionVisible,
+    curveReconstructVisible,
+    adaptiveModelVisible,
+    sandShaleModelVisible,
+    elasticImpedanceVisible,
+    fluidSubSimplifiedVisible,
     quickCalibrationVisible,
     velocityModelingVisible,
     velocityConversionVisible,
     tdConvertVolumeVisible,
     tdConvertHorizonVisible,
     tdConvertFaultVisible,
+    horizonFromTopsVisible,
+    horizonSmoothVisible,
+    horizonCalcVisible,
+    horizonInterpolateVisible,
+    horizonMergeVisible,
+    horizonDecimateVisible,
+    importPresetType,
+    exportPresetType,
+    curveCalculatorPreset,
+    standardizePresetMethod,
+    reservoirParamsPresetType,
     showCreateWorkarea,
     showImportFile,
     showExportFile,
@@ -183,12 +370,38 @@ export const useDialogStore = defineStore('dialog', () => {
     showFilter,
     showCurveCalculator,
     showStandardize,
+    showSegyBrowse,
+    showSeismicImport,
+    showSeismicDisplay,
+    showBasemap,
+    showOutlier,
+    showBaseline,
+    showReservoirParams,
+    showVshCalc,
+    showPorosityCalc,
+    showTotalPorosity,
+    showSWavePredict,
+    showElasticCalc,
+    showFluidSub,
+    showVpCorrection,
+    showDensityCorrection,
+    showCurveReconstruct,
+    showAdaptiveModel,
+    showSandShaleModel,
+    showElasticImpedance,
+    showFluidSubSimplified,
     showQuickCalibration,
     showVelocityModeling,
     showVelocityConversion,
     showTDConvertVolume,
     showTDConvertHorizon,
     showTDConvertFault,
+    showHorizonFromTops,
+    showHorizonSmooth,
+    showHorizonCalc,
+    showHorizonInterpolate,
+    showHorizonMerge,
+    showHorizonDecimate,
     closeAllDialogs
   }
 })

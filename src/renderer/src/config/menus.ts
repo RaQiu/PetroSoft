@@ -226,9 +226,51 @@ export const menuConfig: MenuGroup[] = [
     id: 'rock-physics',
     label: '岩石物理(Y)',
     children: [
-      { id: 'rock-physics.analysis', label: '岩石物理分析' },
-      { id: 'rock-physics.fluid-replace', label: '流体替换' },
-      { id: 'rock-physics.avo-forward', label: 'AVO正演模拟' }
+      {
+        id: 'rock-physics.sensitivity',
+        label: '敏感曲线分析',
+        children: [
+          { id: 'rock-physics.sensitivity.histogram', label: '直方图' },
+          { id: 'rock-physics.sensitivity.crossplot', label: '交会图' }
+        ]
+      },
+      { id: 'rock-physics.divider1', label: '', divider: true },
+      {
+        id: 'rock-physics.reservoir',
+        label: '储层参数计算',
+        children: [
+          { id: 'rock-physics.reservoir.vsh', label: '泥质含量' },
+          { id: 'rock-physics.reservoir.porosity', label: '孔隙度' },
+          { id: 'rock-physics.reservoir.total-porosity', label: '总孔隙度' },
+          { id: 'rock-physics.reservoir.permeability', label: '渗透率' },
+          { id: 'rock-physics.reservoir.saturation', label: '含水饱和度' }
+        ]
+      },
+      { id: 'rock-physics.divider2', label: '', divider: true },
+      { id: 'rock-physics.curve-reconstruct', label: '特征曲线重构' },
+      {
+        id: 'rock-physics.curve-correction',
+        label: '曲线校正',
+        children: [
+          { id: 'rock-physics.curve-correction.vp', label: '校正纵波速度曲线' },
+          { id: 'rock-physics.curve-correction.density', label: '校正密度曲线' }
+        ]
+      },
+      { id: 'rock-physics.divider3', label: '', divider: true },
+      { id: 'rock-physics.predict-vs', label: '横波预测' },
+      { id: 'rock-physics.elastic-impedance', label: '计算弹性阻抗' },
+      { id: 'rock-physics.elastic-params', label: '计算弹性参数' },
+      { id: 'rock-physics.divider4', label: '', divider: true },
+      {
+        id: 'rock-physics.fluid-sub',
+        label: '流体替换',
+        children: [
+          { id: 'rock-physics.fluid-sub.gassmann', label: 'Gassmann 流体替换' },
+          { id: 'rock-physics.fluid-sub.adaptive', label: '自适应模型' },
+          { id: 'rock-physics.fluid-sub.sand-shale', label: '砂泥岩模型' },
+          { id: 'rock-physics.fluid-sub.simplified', label: '简化模型' }
+        ]
+      }
     ]
   },
   {
@@ -269,9 +311,26 @@ export const menuConfig: MenuGroup[] = [
     id: 'smart-interp',
     label: '智能解释(T)',
     children: [
-      { id: 'smart-interp.horizon-track', label: '层位追踪' },
-      { id: 'smart-interp.fault-detect', label: '断层识别' },
-      { id: 'smart-interp.auto-pick', label: '自动拾取' }
+      { id: 'smart-interp.inline', label: '主测线' },
+      { id: 'smart-interp.crossline', label: '联络线' },
+      { id: 'smart-interp.arbitrary', label: '任意线' },
+      { id: 'smart-interp.divider1', label: '', divider: true },
+      { id: 'smart-interp.horizon-interp', label: '层位解释' },
+      { id: 'smart-interp.fault-interp', label: '断层解释' },
+      { id: 'smart-interp.divider2', label: '', divider: true },
+      { id: 'smart-interp.gen-fault-stick', label: '生成解释断层棒' },
+      { id: 'smart-interp.divider3', label: '', divider: true },
+      { id: 'smart-interp.horizon-from-tops', label: '井分层创建层位' },
+      { id: 'smart-interp.horizon-from-model', label: '用井分层和模型提取层位' },
+      { id: 'smart-interp.divider4', label: '', divider: true },
+      { id: 'smart-interp.horizon-auto-dense', label: '层位自动加密解释' },
+      { id: 'smart-interp.horizon-match', label: '层位匹配地震' },
+      { id: 'smart-interp.horizon-interpolate', label: '层位插值' },
+      { id: 'smart-interp.horizon-decimate', label: '层位抽稀' },
+      { id: 'smart-interp.divider5', label: '', divider: true },
+      { id: 'smart-interp.horizon-smooth', label: '层位平滑' },
+      { id: 'smart-interp.horizon-calc', label: '层位计算' },
+      { id: 'smart-interp.horizon-merge', label: '层位合并' }
     ]
   },
   {

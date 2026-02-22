@@ -26,6 +26,10 @@ async def init_db(workarea_path: str) -> None:
         await db.commit()
 
 
+# Track which workarea paths have been schema-ensured in this process
+_schema_ensured: set[str] = set()
+
+
 @asynccontextmanager
 async def get_connection(workarea_path: str):
     """Get an async database connection for a workarea (context manager)."""
@@ -34,6 +38,12 @@ async def get_connection(workarea_path: str):
         db.row_factory = aiosqlite.Row
         await db.execute("PRAGMA foreign_keys = ON")
         await db.execute("PRAGMA journal_mode = WAL")
+        # Ensure schema is up-to-date once per process per workarea
+        if workarea_path not in _schema_ensured:
+            with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
+                schema_sql = f.read()
+            await db.executescript(schema_sql)
+            _schema_ensured.add(workarea_path)
         yield db
 
 

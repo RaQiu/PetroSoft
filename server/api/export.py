@@ -12,6 +12,8 @@ from exporters import (
     format_lithology,
     format_interpretation,
     format_discrete,
+    format_time_depth,
+    format_well_attributes,
 )
 
 router = APIRouter(prefix="/data", tags=["data-export"])
@@ -43,6 +45,10 @@ async def export_data(req: ExportRequest):
                 content = await _export_interpretation(db)
             elif req.data_type == "discrete":
                 content = await _export_discrete(db, req.well_name)
+            elif req.data_type == "time_depth":
+                content = await _export_time_depth(db)
+            elif req.data_type == "well_attribute":
+                content = await _export_well_attributes(db)
             else:
                 raise HTTPException(status_code=400, detail=f"未知数据类型: {req.data_type}")
 
@@ -185,3 +191,46 @@ async def _export_discrete(db, well_name: str):
     if current_name is not None:
         sections.append(format_discrete(current_name, current_points))
     return "\n".join(sections)
+
+
+async def _export_time_depth(db):
+    cursor = await db.execute(
+        "SELECT w.name, td.depth, td.time "
+        "FROM time_depth td JOIN wells w ON td.well_id = w.id "
+        "ORDER BY w.name, td.depth"
+    )
+    rows = await cursor.fetchall()
+    entries = [
+        {"well_name": r[0], "depth": r[1], "time": r[2]}
+        for r in rows
+    ]
+    return format_time_depth(entries)
+
+
+async def _export_well_attributes(db):
+    # Get all attribute names
+    cursor = await db.execute(
+        "SELECT DISTINCT attribute_name FROM well_attributes ORDER BY attribute_name"
+    )
+    attr_rows = await cursor.fetchall()
+    attr_names = [r[0] for r in attr_rows]
+    if not attr_names:
+        raise HTTPException(status_code=404, detail="无井点属性数据")
+
+    # Get all wells with attributes
+    cursor = await db.execute(
+        "SELECT w.name, wa.attribute_name, wa.attribute_value "
+        "FROM well_attributes wa JOIN wells w ON wa.well_id = w.id "
+        "ORDER BY w.name, wa.attribute_name"
+    )
+    rows = await cursor.fetchall()
+
+    # Build per-well attribute map
+    wells_map: dict[str, dict[str, str]] = {}
+    for r in rows:
+        well_name = r[0]
+        if well_name not in wells_map:
+            wells_map[well_name] = {"well_name": well_name}
+        wells_map[well_name][r[1]] = r[2] or ""
+
+    return format_well_attributes(attr_names, list(wells_map.values()))

@@ -32,6 +32,11 @@ export function useMenuAction() {
         window.close()
         break
 
+      // SEG-Y browse (no workarea required)
+      case 'file.segy-browse':
+        dialogStore.showSegyBrowse()
+        break
+
       // Data import menu
       case 'data.well-position.import':
         requireWorkarea(() => dialogStore.showImportFile('coordinates'))
@@ -50,6 +55,12 @@ export function useMenuAction() {
         break
       case 'data.mud-log.import':
         requireWorkarea(() => dialogStore.showImportFile('lithology'))
+        break
+      case 'data.time-depth.import':
+        requireWorkarea(() => dialogStore.showImportFile('time_depth'))
+        break
+      case 'data.well-attribute.import':
+        requireWorkarea(() => dialogStore.showImportFile('well_attribute'))
         break
 
       // Data export menu
@@ -71,6 +82,12 @@ export function useMenuAction() {
       case 'data.mud-log.export':
         requireWorkarea(() => dialogStore.showExportFile('lithology'))
         break
+      case 'data.time-depth.export':
+        requireWorkarea(() => dialogStore.showExportFile('time_depth'))
+        break
+      case 'data.well-attribute.export':
+        requireWorkarea(() => dialogStore.showExportFile('well_attribute'))
+        break
 
       // Data management
       case 'data.data-manage':
@@ -81,10 +98,26 @@ export function useMenuAction() {
       case 'data.query.well':
         requireWorkarea(() => dialogStore.showWellDataQuery())
         break
+      case 'data.query.seismic':
+        requireWorkarea(() => dialogStore.showSeismicDisplay())
+        break
+
+      // Seismic import
+      case 'data.post-seismic.import':
+        requireWorkarea(() => dialogStore.showSeismicImport())
+        break
+
+      // Seismic display
+      case 'seismic.display':
+        requireWorkarea(() => dialogStore.showSeismicDisplay())
+        break
 
       // Well menu
       case 'well.manage':
         requireWorkarea(() => dialogStore.showWellList())
+        break
+      case 'well.curve-edit':
+        requireWorkarea(() => dialogStore.showWellCurve())
         break
       case 'well.resample':
         requireWorkarea(() => dialogStore.showResample())
@@ -113,6 +146,12 @@ export function useMenuAction() {
       case 'well.normalize':
         requireWorkarea(() => dialogStore.showStandardize('normalize'))
         break
+      case 'well.outlier':
+        requireWorkarea(() => dialogStore.showOutlier())
+        break
+      case 'well.baseline':
+        requireWorkarea(() => dialogStore.showBaseline())
+        break
 
       // Velocity menu
       case 'velocity.synthetic':
@@ -140,6 +179,92 @@ export function useMenuAction() {
       // Window menu
       case 'window.close-all':
         dialogStore.closeAllDialogs()
+        break
+
+      // Rock physics menu — sensitivity analysis
+      case 'rock-physics.sensitivity.histogram':
+        requireWorkarea(() => dialogStore.showHistogram())
+        break
+      case 'rock-physics.sensitivity.crossplot':
+        requireWorkarea(() => dialogStore.showCrossplot())
+        break
+
+      // Rock physics menu — reservoir parameters
+      case 'rock-physics.reservoir.vsh':
+        requireWorkarea(() => dialogStore.showVshCalc())
+        break
+      case 'rock-physics.reservoir.porosity':
+        requireWorkarea(() => dialogStore.showPorosityCalc())
+        break
+      case 'rock-physics.reservoir.total-porosity':
+        requireWorkarea(() => dialogStore.showTotalPorosity())
+        break
+      case 'rock-physics.reservoir.permeability':
+        requireWorkarea(() => dialogStore.showReservoirParams('permeability'))
+        break
+      case 'rock-physics.reservoir.saturation':
+        requireWorkarea(() => dialogStore.showReservoirParams('saturation'))
+        break
+
+      // Rock physics menu — advanced
+      case 'rock-physics.predict-vs':
+        requireWorkarea(() => dialogStore.showSWavePredict())
+        break
+      case 'rock-physics.elastic-params':
+        requireWorkarea(() => dialogStore.showElasticCalc())
+        break
+      case 'rock-physics.fluid-sub':
+      case 'rock-physics.fluid-sub.gassmann':
+        requireWorkarea(() => dialogStore.showFluidSub())
+        break
+
+      // Rock physics menu — new dialogs
+      case 'rock-physics.curve-correction.vp':
+        requireWorkarea(() => dialogStore.showVpCorrection())
+        break
+      case 'rock-physics.curve-correction.density':
+        requireWorkarea(() => dialogStore.showDensityCorrection())
+        break
+      case 'rock-physics.curve-reconstruct':
+        requireWorkarea(() => dialogStore.showCurveReconstruct())
+        break
+      case 'rock-physics.elastic-impedance':
+        requireWorkarea(() => dialogStore.showElasticImpedance())
+        break
+      case 'rock-physics.fluid-sub.adaptive':
+        requireWorkarea(() => dialogStore.showAdaptiveModel())
+        break
+      case 'rock-physics.fluid-sub.sand-shale':
+        requireWorkarea(() => dialogStore.showSandShaleModel())
+        break
+      case 'rock-physics.fluid-sub.simplified':
+        requireWorkarea(() => dialogStore.showFluidSubSimplified())
+        break
+
+      // Smart interpretation menu — seismic views
+      case 'smart-interp.inline':
+      case 'smart-interp.crossline':
+        requireWorkarea(() => dialogStore.showSeismicDisplay())
+        break
+
+      // Smart interpretation menu — horizon operations
+      case 'smart-interp.horizon-from-tops':
+        requireWorkarea(() => dialogStore.showHorizonFromTops())
+        break
+      case 'smart-interp.horizon-smooth':
+        requireWorkarea(() => dialogStore.showHorizonSmooth())
+        break
+      case 'smart-interp.horizon-calc':
+        requireWorkarea(() => dialogStore.showHorizonCalc())
+        break
+      case 'smart-interp.horizon-interpolate':
+        requireWorkarea(() => dialogStore.showHorizonInterpolate())
+        break
+      case 'smart-interp.horizon-merge':
+        requireWorkarea(() => dialogStore.showHorizonMerge())
+        break
+      case 'smart-interp.horizon-decimate':
+        requireWorkarea(() => dialogStore.showHorizonDecimate())
         break
 
       // Help menu
