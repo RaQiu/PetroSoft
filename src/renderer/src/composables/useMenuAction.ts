@@ -114,6 +114,29 @@ export function useMenuAction() {
         requireWorkarea(() => dialogStore.showStandardize('normalize'))
         break
 
+      // Velocity menu
+      case 'velocity.synthetic':
+        ElMessage.info('合成记录功能开发中...')
+        break
+      case 'velocity.quick-calibration':
+        requireWorkarea(() => dialogStore.showQuickCalibration())
+        break
+      case 'velocity.modeling.constraint':
+        requireWorkarea(() => dialogStore.showVelocityModeling())
+        break
+      case 'velocity.conversion':
+        requireWorkarea(() => dialogStore.showVelocityConversion())
+        break
+      case 'velocity.td-convert.volume':
+        requireWorkarea(() => dialogStore.showTDConvertVolume())
+        break
+      case 'velocity.td-convert.horizon':
+        requireWorkarea(() => dialogStore.showTDConvertHorizon())
+        break
+      case 'velocity.td-convert.fault':
+        requireWorkarea(() => dialogStore.showTDConvertFault())
+        break
+
       // Window menu
       case 'window.close-all':
         dialogStore.closeAllDialogs()

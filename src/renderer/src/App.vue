@@ -26,6 +26,12 @@
     <FilterDialog />
     <CurveCalculatorDialog />
     <StandardizeDialog />
+    <QuickCalibrationDialog />
+    <VelocityModelingDialog />
+    <VelocityConversionDialog />
+    <TDConvertVolumeDialog />
+    <TDConvertHorizonDialog />
+    <TDConvertFaultDialog />
   </div>
 </template>
 
@@ -52,6 +58,12 @@ import ResampleDialog from '@/components/dialogs/ResampleDialog.vue'
 import FilterDialog from '@/components/dialogs/FilterDialog.vue'
 import CurveCalculatorDialog from '@/components/dialogs/CurveCalculatorDialog.vue'
 import StandardizeDialog from '@/components/dialogs/StandardizeDialog.vue'
+import QuickCalibrationDialog from '@/components/dialogs/QuickCalibrationDialog.vue'
+import VelocityModelingDialog from '@/components/dialogs/VelocityModelingDialog.vue'
+import VelocityConversionDialog from '@/components/dialogs/VelocityConversionDialog.vue'
+import TDConvertVolumeDialog from '@/components/dialogs/TDConvertVolumeDialog.vue'
+import TDConvertHorizonDialog from '@/components/dialogs/TDConvertHorizonDialog.vue'
+import TDConvertFaultDialog from '@/components/dialogs/TDConvertFaultDialog.vue'
 
 const workareaStore = useWorkareaStore()
 const dialogStore = useDialogStore()

@@ -244,9 +244,25 @@ export const menuConfig: MenuGroup[] = [
     id: 'velocity',
     label: '速度(V)',
     children: [
-      { id: 'velocity.analysis', label: '速度分析' },
-      { id: 'velocity.modeling', label: '速度建模' },
-      { id: 'velocity.conversion', label: '速度转换' }
+      { id: 'velocity.synthetic', label: '合成记录' },
+      { id: 'velocity.quick-calibration', label: '快速标定' },
+      {
+        id: 'velocity.modeling',
+        label: '速度场建模',
+        children: [
+          { id: 'velocity.modeling.constraint', label: '模型约束' }
+        ]
+      },
+      { id: 'velocity.conversion', label: '速度场转换' },
+      {
+        id: 'velocity.td-convert',
+        label: '时深转换',
+        children: [
+          { id: 'velocity.td-convert.volume', label: '体' },
+          { id: 'velocity.td-convert.horizon', label: '层位' },
+          { id: 'velocity.td-convert.fault', label: '断层' }
+        ]
+      }
     ]
   },
   {

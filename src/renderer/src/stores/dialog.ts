@@ -16,6 +16,12 @@ export const useDialogStore = defineStore('dialog', () => {
   const filterVisible = ref(false)
   const curveCalculatorVisible = ref(false)
   const standardizeVisible = ref(false)
+  const quickCalibrationVisible = ref(false)
+  const velocityModelingVisible = ref(false)
+  const velocityConversionVisible = ref(false)
+  const tdConvertVolumeVisible = ref(false)
+  const tdConvertHorizonVisible = ref(false)
+  const tdConvertFaultVisible = ref(false)
 
   // Pre-set data type for import/export dialog
   const importPresetType = ref('')
@@ -91,6 +97,30 @@ export const useDialogStore = defineStore('dialog', () => {
     standardizeVisible.value = true
   }
 
+  function showQuickCalibration() {
+    quickCalibrationVisible.value = true
+  }
+
+  function showVelocityModeling() {
+    velocityModelingVisible.value = true
+  }
+
+  function showVelocityConversion() {
+    velocityConversionVisible.value = true
+  }
+
+  function showTDConvertVolume() {
+    tdConvertVolumeVisible.value = true
+  }
+
+  function showTDConvertHorizon() {
+    tdConvertHorizonVisible.value = true
+  }
+
+  function showTDConvertFault() {
+    tdConvertFaultVisible.value = true
+  }
+
   function closeAllDialogs() {
     createWorkareaVisible.value = false
     importFileVisible.value = false
@@ -106,6 +136,12 @@ export const useDialogStore = defineStore('dialog', () => {
     filterVisible.value = false
     curveCalculatorVisible.value = false
     standardizeVisible.value = false
+    quickCalibrationVisible.value = false
+    velocityModelingVisible.value = false
+    velocityConversionVisible.value = false
+    tdConvertVolumeVisible.value = false
+    tdConvertHorizonVisible.value = false
+    tdConvertFaultVisible.value = false
   }
 
   return {
@@ -127,6 +163,12 @@ export const useDialogStore = defineStore('dialog', () => {
     exportPresetType,
     curveCalculatorPreset,
     standardizePresetMethod,
+    quickCalibrationVisible,
+    velocityModelingVisible,
+    velocityConversionVisible,
+    tdConvertVolumeVisible,
+    tdConvertHorizonVisible,
+    tdConvertFaultVisible,
     showCreateWorkarea,
     showImportFile,
     showExportFile,
@@ -141,6 +183,12 @@ export const useDialogStore = defineStore('dialog', () => {
     showFilter,
     showCurveCalculator,
     showStandardize,
+    showQuickCalibration,
+    showVelocityModeling,
+    showVelocityConversion,
+    showTDConvertVolume,
+    showTDConvertHorizon,
+    showTDConvertFault,
     closeAllDialogs
   }
 })
