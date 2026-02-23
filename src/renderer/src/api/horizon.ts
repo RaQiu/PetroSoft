@@ -1,4 +1,4 @@
-import api from './index'
+import apiClient from './client'
 
 export interface HorizonInfo {
   id: number
@@ -9,12 +9,12 @@ export interface HorizonInfo {
 }
 
 export async function listHorizons(workareaPath: string): Promise<HorizonInfo[]> {
-  const res = await api.get('/horizons/list', { params: { workarea: workareaPath } })
+  const res = await apiClient.get('/horizons/list', { params: { workarea: workareaPath } })
   return res.data.horizons
 }
 
 export async function listFormations(workareaPath: string): Promise<string[]> {
-  const res = await api.get('/horizons/formations', { params: { workarea: workareaPath } })
+  const res = await apiClient.get('/horizons/formations', { params: { workarea: workareaPath } })
   return res.data.formations
 }
 
@@ -26,7 +26,7 @@ export interface HorizonFromWellTopsParams {
 }
 
 export async function createHorizonFromWellTops(params: HorizonFromWellTopsParams) {
-  const res = await api.post('/horizons/from-well-tops', params)
+  const res = await apiClient.post('/horizons/from-well-tops', params)
   return res.data
 }
 
@@ -39,7 +39,7 @@ export interface HorizonSmoothParams {
 }
 
 export async function smoothHorizon(params: HorizonSmoothParams) {
-  const res = await api.post('/horizons/smooth', params)
+  const res = await apiClient.post('/horizons/smooth', params)
   return res.data
 }
 
@@ -53,7 +53,7 @@ export interface HorizonCalcParams {
 }
 
 export async function calculateHorizon(params: HorizonCalcParams) {
-  const res = await api.post('/horizons/calculate', params)
+  const res = await apiClient.post('/horizons/calculate', params)
   return res.data
 }
 
@@ -65,7 +65,7 @@ export interface HorizonInterpolateParams {
 }
 
 export async function interpolateHorizon(params: HorizonInterpolateParams) {
-  const res = await api.post('/horizons/interpolate', params)
+  const res = await apiClient.post('/horizons/interpolate', params)
   return res.data
 }
 
@@ -77,7 +77,7 @@ export interface HorizonMergeParams {
 }
 
 export async function mergeHorizons(params: HorizonMergeParams) {
-  const res = await api.post('/horizons/merge', params)
+  const res = await apiClient.post('/horizons/merge', params)
   return res.data
 }
 
@@ -89,11 +89,11 @@ export interface HorizonDecimateParams {
 }
 
 export async function decimateHorizon(params: HorizonDecimateParams) {
-  const res = await api.post('/horizons/decimate', params)
+  const res = await apiClient.post('/horizons/decimate', params)
   return res.data
 }
 
 export async function deleteHorizon(name: string, workareaPath: string) {
-  const res = await api.delete(`/horizons/${encodeURIComponent(name)}`, { params: { workarea: workareaPath } })
+  const res = await apiClient.delete(`/horizons/${encodeURIComponent(name)}`, { params: { workarea: workareaPath } })
   return res.data
 }
