@@ -111,6 +111,9 @@ async def import_seismic(req: SeismicImportRequest):
     if not os.path.isdir(req.workarea_path):
         raise HTTPException(status_code=404, detail="工区目录不存在")
 
+    # survey geometry extracted during the same read pass
+    survey_geo = None
+
     try:
         with open_segy(req.file_path) as f:
             ilines = f.ilines
@@ -131,6 +134,41 @@ async def import_seismic(req: SeismicImportRequest):
                     "crossline_max": int(xlines[-1]),
                     "format_code": format_code,
                 }
+
+                # --- extract survey geometry from trace headers ---
+                il_step = int(ilines[1] - ilines[0]) if len(ilines) > 1 else 1
+                xl_step = int(xlines[1] - xlines[0]) if len(xlines) > 1 else 1
+
+                def _read_coord(il_idx, xl_idx):
+                    tidx = il_idx * len(xlines) + xl_idx
+                    cx = float(f.header[tidx].get(segyio.TraceField.CDP_X, 0))
+                    cy = float(f.header[tidx].get(segyio.TraceField.CDP_Y, 0))
+                    sc = int(f.header[tidx].get(segyio.TraceField.SourceGroupScalar, 0))
+                    if sc < 0:
+                        cx /= abs(sc); cy /= abs(sc)
+                    elif sc > 0:
+                        cx *= sc; cy *= sc
+                    return cx, cy
+
+                try:
+                    ox, oy = _read_coord(0, 0)
+                    il_dx, il_dy = 0.0, 0.0
+                    xl_dx, xl_dy = 0.0, 0.0
+                    if len(ilines) > 1:
+                        x1, y1 = _read_coord(1, 0)
+                        il_dx, il_dy = x1 - ox, y1 - oy
+                    if len(xlines) > 1:
+                        x1, y1 = _read_coord(0, 1)
+                        xl_dx, xl_dy = x1 - ox, y1 - oy
+                    survey_geo = {
+                        "il_min": int(ilines[0]), "il_max": int(ilines[-1]), "il_step": il_step,
+                        "xl_min": int(xlines[0]), "xl_max": int(xlines[-1]), "xl_step": xl_step,
+                        "origin_x": ox, "origin_y": oy,
+                        "il_dx": il_dx, "il_dy": il_dy,
+                        "xl_dx": xl_dx, "xl_dy": xl_dy,
+                    }
+                except Exception:
+                    pass  # coordinate extraction failed — skip survey creation
             else:
                 # Geometry completely unresolvable — scan trace headers
                 il_field = segyio.TraceField.INLINE_3D
@@ -185,6 +223,28 @@ async def import_seismic(req: SeismicImportRequest):
             if "UNIQUE constraint" in str(e):
                 raise HTTPException(status_code=409, detail=f"数据体名称 '{req.name}' 已存在")
             raise HTTPException(status_code=500, detail=f"写入数据库失败: {str(e)}")
+
+    # Auto-create a survey with the same name (silently skip if already exists)
+    if survey_geo is not None:
+        async with get_connection(req.workarea_path) as db:
+            try:
+                await db.execute(
+                    """INSERT INTO surveys
+                       (name, inline_min, inline_max, inline_step,
+                        crossline_min, crossline_max, crossline_step,
+                        origin_x, origin_y,
+                        inline_dx, inline_dy, crossline_dx, crossline_dy)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (req.name,
+                     survey_geo["il_min"], survey_geo["il_max"], survey_geo["il_step"],
+                     survey_geo["xl_min"], survey_geo["xl_max"], survey_geo["xl_step"],
+                     survey_geo["origin_x"], survey_geo["origin_y"],
+                     survey_geo["il_dx"], survey_geo["il_dy"],
+                     survey_geo["xl_dx"], survey_geo["xl_dy"]),
+                )
+                await db.commit()
+            except Exception:
+                pass  # duplicate or other error — volume import still succeeds
 
     return {"status": "ok", "message": f"地震数据体 '{req.name}' 导入成功", "metadata": meta}
 
