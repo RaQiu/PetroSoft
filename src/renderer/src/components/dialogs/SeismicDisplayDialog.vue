@@ -13,6 +13,15 @@
           <el-select v-model="selectedVolumeId" placeholder="选择数据体" style="width: 100%" @change="onVolumeChange">
             <el-option v-for="v in volumes" :key="v.id" :label="v.name" :value="v.id" />
           </el-select>
+          <el-button
+            v-if="selectedVolume"
+            size="small"
+            :loading="creatingSurvey"
+            @click="onCreateSurvey"
+            style="margin-top: 4px"
+          >
+            从此数据体创建测网
+          </el-button>
         </div>
 
         <div class="sidebar-section">
@@ -95,7 +104,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
-import { listSeismicVolumes, getSeismicSection } from '@/api/seismic'
+import { listSeismicVolumes, getSeismicSection, createSurveyFromVolume } from '@/api/seismic'
 import type { SeismicVolumeInfo } from '@/types/seismic'
 
 use([HeatmapChart, GridComponent, TooltipComponent, VisualMapComponent, DataZoomComponent, CanvasRenderer])
@@ -109,6 +118,7 @@ const direction = ref<'inline' | 'crossline'>('inline')
 const lineIndex = ref(0)
 const downsample = ref(1)
 const loading = ref(false)
+const creatingSurvey = ref(false)
 const chartOption = ref<Record<string, unknown> | null>(null)
 const ampInfo = ref<{ min: number; max: number; traces: number; samples: number } | null>(null)
 
@@ -159,6 +169,24 @@ function onVolumeChange() {
     lineIndex.value = direction.value === 'inline'
       ? (selectedVolume.value.inline_min ?? 0)
       : (selectedVolume.value.crossline_min ?? 0)
+  }
+}
+
+async function onCreateSurvey() {
+  if (!selectedVolume.value) return
+  creatingSurvey.value = true
+  try {
+    await createSurveyFromVolume(workareaStore.path, selectedVolume.value.id, selectedVolume.value.name)
+    ElMessage.success(`测网 "${selectedVolume.value.name}" 创建成功`)
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'response' in e) {
+      const axiosErr = e as { response?: { data?: { detail?: string } } }
+      ElMessage.error(axiosErr.response?.data?.detail || '创建测网失败')
+    } else {
+      ElMessage.error('创建测网失败')
+    }
+  } finally {
+    creatingSurvey.value = false
   }
 }
 
