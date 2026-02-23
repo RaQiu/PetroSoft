@@ -3,7 +3,8 @@ import type {
   SeismicVolumeInfo,
   SegyHeaderInfo,
   SeismicSectionData,
-  SurveyOutline
+  SurveyOutline,
+  SurveyInfo
 } from '@/types/seismic'
 
 export async function browseSegyHeaders(filePath: string): Promise<SegyHeaderInfo> {
@@ -43,6 +44,29 @@ export async function getSeismicSection(
       ...(downsample && downsample > 1 ? { downsample } : {})
     },
     timeout: 60000
+  })
+  return res.data
+}
+
+export async function listSurveys(workarea: string): Promise<SurveyInfo[]> {
+  const res = await apiClient.get('/seismic/surveys', { params: { workarea } })
+  return res.data.surveys
+}
+
+export async function createSurveyFromVolume(
+  workarea: string,
+  volumeId: number,
+  surveyName: string
+) {
+  const res = await apiClient.post('/seismic/surveys/from-volume', null, {
+    params: { workarea, volume_id: volumeId, survey_name: surveyName }
+  })
+  return res.data
+}
+
+export async function deleteSurvey(workarea: string, surveyName: string) {
+  const res = await apiClient.delete(`/seismic/surveys/${encodeURIComponent(surveyName)}`, {
+    params: { workarea }
   })
   return res.data
 }

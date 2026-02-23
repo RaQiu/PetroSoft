@@ -166,6 +166,25 @@ CREATE TABLE IF NOT EXISTS horizon_data (
 CREATE INDEX IF NOT EXISTS idx_horizon_data_horizon ON horizon_data(horizon_id);
 CREATE INDEX IF NOT EXISTS idx_horizon_data_grid ON horizon_data(horizon_id, inline_no, crossline_no);
 
+-- Seismic survey grids (测网)
+CREATE TABLE IF NOT EXISTS surveys (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    inline_min INTEGER NOT NULL,
+    inline_max INTEGER NOT NULL,
+    inline_step INTEGER NOT NULL DEFAULT 1,
+    crossline_min INTEGER NOT NULL,
+    crossline_max INTEGER NOT NULL,
+    crossline_step INTEGER NOT NULL DEFAULT 1,
+    origin_x REAL DEFAULT 0,
+    origin_y REAL DEFAULT 0,
+    inline_dx REAL DEFAULT 0,
+    inline_dy REAL DEFAULT 0,
+    crossline_dx REAL DEFAULT 0,
+    crossline_dy REAL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 -- Seismic volumes table
 CREATE TABLE IF NOT EXISTS seismic_volumes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -8,7 +8,7 @@
     <el-form :model="form" label-width="100px" size="small">
       <el-form-item label="测网">
         <el-select v-model="form.surveyNet" placeholder="选择测网" style="width: 100%">
-          <el-option label="(无)" value="" disabled />
+          <el-option v-for="s in surveys" :key="s.id" :label="s.name" :value="s.name" />
         </el-select>
       </el-form-item>
       <el-form-item label="速度体">
@@ -65,20 +65,25 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useDialogStore } from '@/stores/dialog'
+import { useWorkareaStore } from '@/stores/workarea'
+import { listSurveys } from '@/api/seismic'
+import type { SurveyInfo } from '@/types/seismic'
 
 const dialogStore = useDialogStore()
+const workareaStore = useWorkareaStore()
+const surveys = ref<SurveyInfo[]>([])
 
 const form = reactive({
   surveyNet: '',
   velocityVolume: '',
   conversionType: 'rms2int',
-  inlineStart: 40,
-  inlineEnd: 70,
-  crosslineStart: 40,
-  crosslineEnd: 70,
+  inlineStart: 0,
+  inlineEnd: 0,
+  crosslineStart: 0,
+  crosslineEnd: 0,
   outputName: ''
 })
 
@@ -90,16 +95,29 @@ function onComputeAndClose() {
   ElMessage.info('功能开发中...')
 }
 
-watch(() => dialogStore.velocityConversionVisible, (visible) => {
+watch(() => dialogStore.velocityConversionVisible, async (visible) => {
   if (visible) {
     form.surveyNet = ''
     form.velocityVolume = ''
     form.conversionType = 'rms2int'
-    form.inlineStart = 40
-    form.inlineEnd = 70
-    form.crosslineStart = 40
-    form.crosslineEnd = 70
+    form.inlineStart = 0
+    form.inlineEnd = 0
+    form.crosslineStart = 0
+    form.crosslineEnd = 0
     form.outputName = ''
+    if (workareaStore.currentPath) {
+      try { surveys.value = await listSurveys(workareaStore.currentPath) } catch { surveys.value = [] }
+    }
+  }
+})
+
+watch(() => form.surveyNet, (name) => {
+  const s = surveys.value.find(s => s.name === name)
+  if (s) {
+    form.inlineStart = s.inline_min
+    form.inlineEnd = s.inline_max
+    form.crosslineStart = s.crossline_min
+    form.crosslineEnd = s.crossline_max
   }
 })
 </script>

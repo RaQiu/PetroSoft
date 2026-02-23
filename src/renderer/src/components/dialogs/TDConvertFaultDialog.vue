@@ -8,7 +8,7 @@
     <el-form :model="form" label-width="90px" size="small">
       <el-form-item label="测网">
         <el-select v-model="form.surveyNet" placeholder="选择测网" style="width: 100%">
-          <el-option label="(无)" value="" disabled />
+          <el-option v-for="s in surveys" :key="s.id" :label="s.name" :value="s.name" />
         </el-select>
       </el-form-item>
       <el-form-item label="转换类型">
@@ -58,12 +58,17 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch } from 'vue'
+import { reactive, computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { useDialogStore } from '@/stores/dialog'
+import { useWorkareaStore } from '@/stores/workarea'
+import { listSurveys } from '@/api/seismic'
+import type { SurveyInfo } from '@/types/seismic'
 
 const dialogStore = useDialogStore()
+const workareaStore = useWorkareaStore()
+const surveys = ref<SurveyInfo[]>([])
 
 const form = reactive({
   surveyNet: '',
@@ -89,7 +94,7 @@ function onAbort() {
   ElMessage.info('功能开发中...')
 }
 
-watch(() => dialogStore.tdConvertFaultVisible, (visible) => {
+watch(() => dialogStore.tdConvertFaultVisible, async (visible) => {
   if (visible) {
     form.surveyNet = ''
     form.convertType = 'time2depth'
@@ -99,6 +104,9 @@ watch(() => dialogStore.tdConvertFaultVisible, (visible) => {
     form.faults = []
     form.suffix = 'DepthSMI'
     form.progress = 0
+    if (workareaStore.currentPath) {
+      try { surveys.value = await listSurveys(workareaStore.currentPath) } catch { surveys.value = [] }
+    }
   }
 })
 </script>

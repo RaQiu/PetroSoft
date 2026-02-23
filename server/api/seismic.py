@@ -5,6 +5,7 @@ import math
 from typing import Optional, Tuple
 from contextlib import contextmanager
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 import segyio
 import numpy as np
@@ -368,3 +369,192 @@ async def get_survey_outline(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"读取测区范围失败: {str(e)}")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Survey (测网) management
+# ══════════════════════════════════════════════════════════════════════
+
+@router.get("/surveys")
+async def list_surveys(workarea: str = Query(..., description="工区路径")):
+    """List all surveys in a workarea."""
+    async with get_connection(workarea) as db:
+        cursor = await db.execute(
+            """SELECT id, name, inline_min, inline_max, inline_step,
+                      crossline_min, crossline_max, crossline_step,
+                      origin_x, origin_y,
+                      inline_dx, inline_dy, crossline_dx, crossline_dy,
+                      created_at
+               FROM surveys ORDER BY id"""
+        )
+        rows = await cursor.fetchall()
+        surveys = []
+        for r in rows:
+            surveys.append({
+                "id": r[0], "name": r[1],
+                "inline_min": r[2], "inline_max": r[3], "inline_step": r[4],
+                "crossline_min": r[5], "crossline_max": r[6], "crossline_step": r[7],
+                "origin_x": r[8], "origin_y": r[9],
+                "inline_dx": r[10], "inline_dy": r[11],
+                "crossline_dx": r[12], "crossline_dy": r[13],
+                "created_at": r[14],
+            })
+        return {"status": "ok", "surveys": surveys}
+
+
+class SurveyCreateRequest(BaseModel):
+    workarea_path: str
+    name: str
+    inline_min: int
+    inline_max: int
+    inline_step: int = 1
+    crossline_min: int
+    crossline_max: int
+    crossline_step: int = 1
+    origin_x: float = 0.0
+    origin_y: float = 0.0
+    inline_dx: float = 0.0
+    inline_dy: float = 0.0
+    crossline_dx: float = 0.0
+    crossline_dy: float = 0.0
+
+
+@router.post("/surveys/create")
+async def create_survey(req: SurveyCreateRequest):
+    """Create a survey manually."""
+    async with get_connection(req.workarea_path) as db:
+        try:
+            await db.execute(
+                """INSERT INTO surveys
+                   (name, inline_min, inline_max, inline_step,
+                    crossline_min, crossline_max, crossline_step,
+                    origin_x, origin_y,
+                    inline_dx, inline_dy, crossline_dx, crossline_dy)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (req.name, req.inline_min, req.inline_max, req.inline_step,
+                 req.crossline_min, req.crossline_max, req.crossline_step,
+                 req.origin_x, req.origin_y,
+                 req.inline_dx, req.inline_dy, req.crossline_dx, req.crossline_dy),
+            )
+            await db.commit()
+        except Exception as e:
+            if "UNIQUE constraint" in str(e):
+                raise HTTPException(status_code=409, detail=f"测网 '{req.name}' 已存在")
+            raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "ok", "message": f"测网 '{req.name}' 创建成功"}
+
+
+@router.post("/surveys/from-volume")
+async def create_survey_from_volume(
+    workarea: str = Query(..., description="工区路径"),
+    volume_id: int = Query(..., description="数据体 ID"),
+    survey_name: str = Query(..., description="测网名称"),
+):
+    """Auto-create a survey from a seismic volume's geometry and trace headers."""
+    async with get_connection(workarea) as db:
+        cursor = await db.execute(
+            "SELECT file_path, inline_min, inline_max, crossline_min, crossline_max FROM seismic_volumes WHERE id = ?",
+            (volume_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="数据体不存在")
+        file_path = row[0]
+        il_min, il_max, xl_min, xl_max = row[1], row[2], row[3], row[4]
+
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail=f"SEG-Y 文件不存在: {file_path}")
+
+    # Extract coordinate transform from trace headers
+    origin_x, origin_y = 0.0, 0.0
+    il_dx, il_dy = 0.0, 0.0
+    xl_dx, xl_dy = 0.0, 0.0
+    il_step, xl_step = 1, 1
+
+    try:
+        with open_segy(file_path) as f:
+            ilines = f.ilines
+            xlines = f.xlines
+            if ilines is None or xlines is None:
+                raise HTTPException(status_code=400, detail="无法识别数据体测线几何信息")
+
+            il_step = int(ilines[1] - ilines[0]) if len(ilines) > 1 else 1
+            xl_step = int(xlines[1] - xlines[0]) if len(xlines) > 1 else 1
+
+            def _read_coord(il_idx, xl_idx):
+                trace_idx = il_idx * len(xlines) + xl_idx
+                x = float(f.header[trace_idx].get(segyio.TraceField.CDP_X, 0))
+                y = float(f.header[trace_idx].get(segyio.TraceField.CDP_Y, 0))
+                scalar = int(f.header[trace_idx].get(segyio.TraceField.SourceGroupScalar, 0))
+                if scalar < 0:
+                    x /= abs(scalar)
+                    y /= abs(scalar)
+                elif scalar > 0:
+                    x *= scalar
+                    y *= scalar
+                return x, y
+
+            # Origin = first inline, first crossline
+            origin_x, origin_y = _read_coord(0, 0)
+
+            # Direction vectors: per-step increments
+            if len(ilines) > 1:
+                x1, y1 = _read_coord(1, 0)
+                il_dx = x1 - origin_x
+                il_dy = y1 - origin_y
+            if len(xlines) > 1:
+                x1, y1 = _read_coord(0, 1)
+                xl_dx = x1 - origin_x
+                xl_dy = y1 - origin_y
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取 SEG-Y 几何信息失败: {str(e)}")
+
+    async with get_connection(workarea) as db:
+        try:
+            await db.execute(
+                """INSERT INTO surveys
+                   (name, inline_min, inline_max, inline_step,
+                    crossline_min, crossline_max, crossline_step,
+                    origin_x, origin_y,
+                    inline_dx, inline_dy, crossline_dx, crossline_dy)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (survey_name, il_min, il_max, il_step,
+                 xl_min, xl_max, xl_step,
+                 origin_x, origin_y,
+                 il_dx, il_dy, xl_dx, xl_dy),
+            )
+            await db.commit()
+        except Exception as e:
+            if "UNIQUE constraint" in str(e):
+                raise HTTPException(status_code=409, detail=f"测网 '{survey_name}' 已存在")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "status": "ok",
+        "message": f"从数据体创建测网 '{survey_name}' 成功",
+        "survey": {
+            "name": survey_name,
+            "inline_min": il_min, "inline_max": il_max, "inline_step": il_step,
+            "crossline_min": xl_min, "crossline_max": xl_max, "crossline_step": xl_step,
+            "origin_x": origin_x, "origin_y": origin_y,
+            "inline_dx": il_dx, "inline_dy": il_dy,
+            "crossline_dx": xl_dx, "crossline_dy": xl_dy,
+        },
+    }
+
+
+@router.delete("/surveys/{survey_name}")
+async def delete_survey(
+    survey_name: str,
+    workarea: str = Query(..., description="工区路径"),
+):
+    """Delete a survey by name."""
+    async with get_connection(workarea) as db:
+        cursor = await db.execute("DELETE FROM surveys WHERE name = ?", (survey_name,))
+        await db.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"测网 '{survey_name}' 不存在")
+    return {"status": "ok", "message": f"测网 '{survey_name}' 已删除"}

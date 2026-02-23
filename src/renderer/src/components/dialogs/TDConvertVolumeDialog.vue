@@ -8,7 +8,7 @@
     <el-form :model="form" label-width="110px" size="small">
       <el-form-item label="测网">
         <el-select v-model="form.surveyNet" placeholder="选择测网" style="width: 100%">
-          <el-option label="(无)" value="" disabled />
+          <el-option v-for="s in surveys" :key="s.id" :label="s.name" :value="s.name" />
         </el-select>
       </el-form-item>
       <el-form-item label="转换类型">
@@ -77,11 +77,16 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useDialogStore } from '@/stores/dialog'
+import { useWorkareaStore } from '@/stores/workarea'
+import { listSurveys } from '@/api/seismic'
+import type { SurveyInfo } from '@/types/seismic'
 
 const dialogStore = useDialogStore()
+const workareaStore = useWorkareaStore()
+const surveys = ref<SurveyInfo[]>([])
 
 const form = reactive({
   surveyNet: '',
@@ -90,10 +95,10 @@ const form = reactive({
   sourceData: '',
   velocityVolume: '',
   rangeType: 'volume',
-  lineStart: 40,
-  lineEnd: 70,
-  traceStart: 40,
-  traceEnd: 70,
+  lineStart: 0,
+  lineEnd: 0,
+  traceStart: 0,
+  traceEnd: 0,
   sampleRate: 2,
   outputName: 'Vol'
 })
@@ -106,7 +111,7 @@ function onComputeAndClose() {
   ElMessage.info('功能开发中...')
 }
 
-watch(() => dialogStore.tdConvertVolumeVisible, (visible) => {
+watch(() => dialogStore.tdConvertVolumeVisible, async (visible) => {
   if (visible) {
     form.surveyNet = ''
     form.convertType = 'time2depth'
@@ -114,12 +119,25 @@ watch(() => dialogStore.tdConvertVolumeVisible, (visible) => {
     form.sourceData = ''
     form.velocityVolume = ''
     form.rangeType = 'volume'
-    form.lineStart = 40
-    form.lineEnd = 70
-    form.traceStart = 40
-    form.traceEnd = 70
+    form.lineStart = 0
+    form.lineEnd = 0
+    form.traceStart = 0
+    form.traceEnd = 0
     form.sampleRate = 2
     form.outputName = 'Vol'
+    if (workareaStore.currentPath) {
+      try { surveys.value = await listSurveys(workareaStore.currentPath) } catch { surveys.value = [] }
+    }
+  }
+})
+
+watch(() => form.surveyNet, (name) => {
+  const s = surveys.value.find(s => s.name === name)
+  if (s) {
+    form.lineStart = s.inline_min
+    form.lineEnd = s.inline_max
+    form.traceStart = s.crossline_min
+    form.traceEnd = s.crossline_max
   }
 })
 </script>

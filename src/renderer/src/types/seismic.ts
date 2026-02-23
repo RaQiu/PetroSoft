@@ -38,3 +38,21 @@ export interface SurveyOutlinePoint {
 export interface SurveyOutline {
   outline: SurveyOutlinePoint[]
 }
+
+export interface SurveyInfo {
+  id: number
+  name: string
+  inline_min: number
+  inline_max: number
+  inline_step: number
+  crossline_min: number
+  crossline_max: number
+  crossline_step: number
+  origin_x: number
+  origin_y: number
+  inline_dx: number
+  inline_dy: number
+  crossline_dx: number
+  crossline_dy: number
+  created_at: string
+}

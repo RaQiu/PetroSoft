@@ -11,7 +11,7 @@
         <el-form :model="form" label-width="70px" size="small">
           <el-form-item label="测网">
             <el-select v-model="form.surveyNet" placeholder="选择测网" style="width: 100%">
-              <el-option label="(无)" value="" disabled />
+              <el-option v-for="s in surveys" :key="s.id" :label="s.name" :value="s.name" />
             </el-select>
           </el-form-item>
         </el-form>
@@ -84,11 +84,17 @@
 import { reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useDialogStore } from '@/stores/dialog'
+import { useWorkareaStore } from '@/stores/workarea'
+import { listSurveys } from '@/api/seismic'
+import type { SurveyInfo } from '@/types/seismic'
 import * as echarts from 'echarts'
 
 const dialogStore = useDialogStore()
+const workareaStore = useWorkareaStore()
 const chartRef = ref<HTMLElement>()
 let chartInstance: echarts.ECharts | null = null
+
+const surveys = ref<SurveyInfo[]>([])
 
 const form = reactive({
   surveyNet: '',
@@ -125,20 +131,33 @@ function onResize() {
   chartInstance?.resize()
 }
 
-watch(() => dialogStore.velocityModelingVisible, (visible) => {
+watch(() => dialogStore.velocityModelingVisible, async (visible) => {
   if (visible) {
     form.surveyNet = ''
     form.activeTab = 'input'
     form.gridModel = ''
     form.rangeType = 'volume'
-    form.inlineStart = 40
-    form.inlineEnd = 70
-    form.crosslineStart = 40
-    form.crosslineEnd = 70
+    form.inlineStart = 0
+    form.inlineEnd = 0
+    form.crosslineStart = 0
+    form.crosslineEnd = 0
+    if (workareaStore.currentPath) {
+      try { surveys.value = await listSurveys(workareaStore.currentPath) } catch { surveys.value = [] }
+    }
     setTimeout(() => initChart(), 100)
   } else {
     chartInstance?.dispose()
     chartInstance = null
+  }
+})
+
+watch(() => form.surveyNet, (name) => {
+  const s = surveys.value.find(s => s.name === name)
+  if (s) {
+    form.inlineStart = s.inline_min
+    form.inlineEnd = s.inline_max
+    form.crosslineStart = s.crossline_min
+    form.crosslineEnd = s.crossline_max
   }
 })
 
