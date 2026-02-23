@@ -125,8 +125,8 @@ watch(() => dialogStore.tdConvertVolumeVisible, async (visible) => {
     form.traceEnd = 0
     form.sampleRate = 2
     form.outputName = 'Vol'
-    if (workareaStore.currentPath) {
-      try { surveys.value = await listSurveys(workareaStore.currentPath) } catch { surveys.value = [] }
+    if (workareaStore.path) {
+      try { surveys.value = await listSurveys(workareaStore.path) } catch { surveys.value = [] }
     }
   }
 })

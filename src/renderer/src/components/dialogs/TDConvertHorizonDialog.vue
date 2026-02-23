@@ -89,8 +89,8 @@ watch(() => dialogStore.tdConvertHorizonVisible, async (visible) => {
     form.horizons = []
     form.suffix = 'Depth'
     form.progress = 0
-    if (workareaStore.currentPath) {
-      try { surveys.value = await listSurveys(workareaStore.currentPath) } catch { surveys.value = [] }
+    if (workareaStore.path) {
+      try { surveys.value = await listSurveys(workareaStore.path) } catch { surveys.value = [] }
     }
   }
 })
