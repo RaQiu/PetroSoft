@@ -1,4 +1,10 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
+import {
+  openChildWindow,
+  closeChildWindow,
+  closeAllChildWindows,
+  getOpenWindowStates
+} from './windowManager'
 
 export function registerIpcHandlers(): void {
   ipcMain.handle('dialog:openDirectory', async () => {
@@ -27,5 +33,34 @@ export function registerIpcHandlers(): void {
       defaultPath
     })
     return result
+  })
+
+  // Child window management
+  ipcMain.handle(
+    'window:open',
+    async (
+      _event,
+      args: {
+        id: string
+        workarea: string
+        preset?: string
+        size?: { width: number; height: number }
+        pos?: { x: number; y: number }
+      }
+    ) => {
+      openChildWindow(args.id, args.workarea, args.preset, args.size, args.pos)
+    }
+  )
+
+  ipcMain.handle('window:close', async (_event, windowId: string) => {
+    closeChildWindow(windowId)
+  })
+
+  ipcMain.handle('window:close-all', async () => {
+    closeAllChildWindows()
+  })
+
+  ipcMain.handle('window:get-states', async () => {
+    return getOpenWindowStates()
   })
 }

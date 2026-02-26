@@ -116,8 +116,9 @@ export function useMenuAction() {
       case 'well.manage':
         requireWorkarea(() => dialogStore.showWellList())
         break
+      case 'well.composite-log':
       case 'well.curve-edit':
-        requireWorkarea(() => dialogStore.showWellCurve())
+        requireWorkarea(() => dialogStore.showCompositeLog())
         break
       case 'well.resample':
         requireWorkarea(() => dialogStore.showResample())

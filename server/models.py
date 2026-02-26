@@ -92,6 +92,65 @@ class SeismicVolume(BaseModel):
     format_code: Optional[int] = None
 
 
+class UpdateWellRequest(BaseModel):
+    workarea_path: str
+    name: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
+    kb: Optional[float] = None
+    td: Optional[float] = None
+
+
+class UpdateCurveRequest(BaseModel):
+    workarea_path: str
+    name: Optional[str] = None
+    unit: Optional[str] = None
+
+
+class CreateLayerRequest(BaseModel):
+    workarea_path: str
+    formation: str
+    top_depth: float
+    bottom_depth: float
+
+
+class UpdateLayerRequest(BaseModel):
+    workarea_path: str
+    formation: Optional[str] = None
+    top_depth: Optional[float] = None
+    bottom_depth: Optional[float] = None
+
+
+class CreateLithologyRequest(BaseModel):
+    workarea_path: str
+    top_depth: float
+    bottom_depth: float
+    description: str
+
+
+class UpdateLithologyRequest(BaseModel):
+    workarea_path: str
+    top_depth: Optional[float] = None
+    bottom_depth: Optional[float] = None
+    description: Optional[str] = None
+
+
+class CreateInterpretationRequest(BaseModel):
+    workarea_path: str
+    top_depth: float
+    bottom_depth: float
+    conclusion: str
+    category: str = ""
+
+
+class UpdateInterpretationRequest(BaseModel):
+    workarea_path: str
+    top_depth: Optional[float] = None
+    bottom_depth: Optional[float] = None
+    conclusion: Optional[str] = None
+    category: Optional[str] = None
+
+
 class SeismicImportRequest(BaseModel):
     file_path: str
     name: str

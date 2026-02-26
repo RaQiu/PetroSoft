@@ -32,7 +32,7 @@ async def import_data(req: ImportRequest):
     try:
         async with get_connection(req.workarea_path) as db:
             if req.data_type == "coordinates":
-                return await _import_coordinates(db, req.file_path)
+                return await _import_coordinates(db, req.file_path, req.well_name)
             elif req.data_type == "trajectory":
                 return await _import_trajectory(db, req.file_path, req.well_name)
             elif req.data_type == "curves":
@@ -57,8 +57,8 @@ async def import_data(req: ImportRequest):
         raise HTTPException(status_code=500, detail=f"导入失败: {e}")
 
 
-async def _import_coordinates(db, file_path: str):
-    wells = parse_coordinates(file_path)
+async def _import_coordinates(db, file_path: str, well_name: str = ""):
+    wells = parse_coordinates(file_path, fallback_name=well_name or None)
     count = 0
     for w in wells:
         await db.execute(

@@ -1,10 +1,20 @@
-"""Well data query API endpoints."""
+"""Well data query and CRUD API endpoints."""
 
 import math
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from db import get_connection
+from models import (
+    UpdateWellRequest,
+    UpdateCurveRequest,
+    CreateLayerRequest,
+    UpdateLayerRequest,
+    CreateLithologyRequest,
+    UpdateLithologyRequest,
+    CreateInterpretationRequest,
+    UpdateInterpretationRequest,
+)
 
 router = APIRouter(prefix="/well", tags=["well"])
 
@@ -297,3 +307,250 @@ async def query_well_data(
             "page_size": page_size,
             "total_pages": total_pages,
         }
+
+
+# ── Well CRUD ────────────────────────────────────────────────────────
+
+
+@router.put("/{well_name}")
+async def update_well(well_name: str, req: UpdateWellRequest):
+    """Update well attributes or rename."""
+    async with get_connection(req.workarea_path) as db:
+        cursor = await db.execute("SELECT id FROM wells WHERE name = ?", (well_name,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"井 '{well_name}' 不存在")
+
+        updates: list[str] = []
+        params: list = []
+        for field in ("name", "x", "y", "kb", "td"):
+            val = getattr(req, field)
+            if val is not None:
+                updates.append(f"{field} = ?")
+                params.append(val)
+        if not updates:
+            return {"status": "ok"}
+
+        params.append(row[0])
+        await db.execute(
+            f"UPDATE wells SET {', '.join(updates)} WHERE id = ?", params
+        )
+        await db.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/{well_name}")
+async def delete_well(well_name: str, workarea: str = Query(...)):
+    """Delete a well and all its child data (CASCADE)."""
+    async with get_connection(workarea) as db:
+        cursor = await db.execute("SELECT id FROM wells WHERE name = ?", (well_name,))
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail=f"井 '{well_name}' 不存在")
+        await db.execute("DELETE FROM wells WHERE id = ?", (row[0],))
+        await db.commit()
+    return {"status": "ok"}
+
+
+# ── Curve CRUD ───────────────────────────────────────────────────────
+
+
+@router.put("/{well_name}/curves/{curve_id}")
+async def update_curve(well_name: str, curve_id: int, req: UpdateCurveRequest):
+    """Update curve name or unit."""
+    async with get_connection(req.workarea_path) as db:
+        updates: list[str] = []
+        params: list = []
+        if req.name is not None:
+            updates.append("name = ?")
+            params.append(req.name)
+        if req.unit is not None:
+            updates.append("unit = ?")
+            params.append(req.unit)
+        if not updates:
+            return {"status": "ok"}
+
+        params.append(curve_id)
+        await db.execute(
+            f"UPDATE curves SET {', '.join(updates)} WHERE id = ?", params
+        )
+        await db.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/{well_name}/curves/{curve_id}")
+async def delete_curve(
+    well_name: str, curve_id: int, workarea: str = Query(...)
+):
+    """Delete a curve and its data."""
+    async with get_connection(workarea) as db:
+        await db.execute("DELETE FROM curve_data WHERE curve_id = ?", (curve_id,))
+        await db.execute("DELETE FROM curves WHERE id = ?", (curve_id,))
+        await db.commit()
+    return {"status": "ok"}
+
+
+# ── Layer CRUD ───────────────────────────────────────────────────────
+
+
+@router.post("/{well_name}/layers")
+async def create_layer(well_name: str, req: CreateLayerRequest):
+    """Create a new layer entry."""
+    async with get_connection(req.workarea_path) as db:
+        cursor = await db.execute("SELECT id FROM wells WHERE name = ?", (well_name,))
+        well = await cursor.fetchone()
+        if not well:
+            raise HTTPException(status_code=404, detail=f"井 '{well_name}' 不存在")
+
+        cursor = await db.execute(
+            "INSERT INTO layers (well_id, formation, top_depth, bottom_depth) VALUES (?, ?, ?, ?)",
+            (well[0], req.formation, req.top_depth, req.bottom_depth),
+        )
+        await db.commit()
+    return {"status": "ok", "id": cursor.lastrowid}
+
+
+@router.put("/{well_name}/layers/{layer_id}")
+async def update_layer(well_name: str, layer_id: int, req: UpdateLayerRequest):
+    """Update a layer entry."""
+    async with get_connection(req.workarea_path) as db:
+        updates: list[str] = []
+        params: list = []
+        for field in ("formation", "top_depth", "bottom_depth"):
+            val = getattr(req, field)
+            if val is not None:
+                updates.append(f"{field} = ?")
+                params.append(val)
+        if not updates:
+            return {"status": "ok"}
+
+        params.append(layer_id)
+        await db.execute(
+            f"UPDATE layers SET {', '.join(updates)} WHERE id = ?", params
+        )
+        await db.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/{well_name}/layers/{layer_id}")
+async def delete_layer(
+    well_name: str, layer_id: int, workarea: str = Query(...)
+):
+    """Delete a layer entry."""
+    async with get_connection(workarea) as db:
+        await db.execute("DELETE FROM layers WHERE id = ?", (layer_id,))
+        await db.commit()
+    return {"status": "ok"}
+
+
+# ── Lithology CRUD ───────────────────────────────────────────────────
+
+
+@router.post("/{well_name}/lithology")
+async def create_lithology(well_name: str, req: CreateLithologyRequest):
+    """Create a new lithology entry."""
+    async with get_connection(req.workarea_path) as db:
+        cursor = await db.execute("SELECT id FROM wells WHERE name = ?", (well_name,))
+        well = await cursor.fetchone()
+        if not well:
+            raise HTTPException(status_code=404, detail=f"井 '{well_name}' 不存在")
+
+        cursor = await db.execute(
+            "INSERT INTO lithology (well_id, top_depth, bottom_depth, description) VALUES (?, ?, ?, ?)",
+            (well[0], req.top_depth, req.bottom_depth, req.description),
+        )
+        await db.commit()
+    return {"status": "ok", "id": cursor.lastrowid}
+
+
+@router.put("/{well_name}/lithology/{entry_id}")
+async def update_lithology(
+    well_name: str, entry_id: int, req: UpdateLithologyRequest
+):
+    """Update a lithology entry."""
+    async with get_connection(req.workarea_path) as db:
+        updates: list[str] = []
+        params: list = []
+        for field in ("top_depth", "bottom_depth", "description"):
+            val = getattr(req, field)
+            if val is not None:
+                updates.append(f"{field} = ?")
+                params.append(val)
+        if not updates:
+            return {"status": "ok"}
+
+        params.append(entry_id)
+        await db.execute(
+            f"UPDATE lithology SET {', '.join(updates)} WHERE id = ?", params
+        )
+        await db.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/{well_name}/lithology/{entry_id}")
+async def delete_lithology(
+    well_name: str, entry_id: int, workarea: str = Query(...)
+):
+    """Delete a lithology entry."""
+    async with get_connection(workarea) as db:
+        await db.execute("DELETE FROM lithology WHERE id = ?", (entry_id,))
+        await db.commit()
+    return {"status": "ok"}
+
+
+# ── Interpretation CRUD ──────────────────────────────────────────────
+
+
+@router.post("/{well_name}/interpretation")
+async def create_interpretation(
+    well_name: str, req: CreateInterpretationRequest
+):
+    """Create a new interpretation entry."""
+    async with get_connection(req.workarea_path) as db:
+        cursor = await db.execute("SELECT id FROM wells WHERE name = ?", (well_name,))
+        well = await cursor.fetchone()
+        if not well:
+            raise HTTPException(status_code=404, detail=f"井 '{well_name}' 不存在")
+
+        cursor = await db.execute(
+            "INSERT INTO interpretations (well_id, top_depth, bottom_depth, conclusion, category) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (well[0], req.top_depth, req.bottom_depth, req.conclusion, req.category),
+        )
+        await db.commit()
+    return {"status": "ok", "id": cursor.lastrowid}
+
+
+@router.put("/{well_name}/interpretation/{entry_id}")
+async def update_interpretation(
+    well_name: str, entry_id: int, req: UpdateInterpretationRequest
+):
+    """Update an interpretation entry."""
+    async with get_connection(req.workarea_path) as db:
+        updates: list[str] = []
+        params: list = []
+        for field in ("top_depth", "bottom_depth", "conclusion", "category"):
+            val = getattr(req, field)
+            if val is not None:
+                updates.append(f"{field} = ?")
+                params.append(val)
+        if not updates:
+            return {"status": "ok"}
+
+        params.append(entry_id)
+        await db.execute(
+            f"UPDATE interpretations SET {', '.join(updates)} WHERE id = ?", params
+        )
+        await db.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/{well_name}/interpretation/{entry_id}")
+async def delete_interpretation(
+    well_name: str, entry_id: int, workarea: str = Query(...)
+):
+    """Delete an interpretation entry."""
+    async with get_connection(workarea) as db:
+        await db.execute("DELETE FROM interpretations WHERE id = ?", (entry_id,))
+        await db.commit()
+    return {"status": "ok"}

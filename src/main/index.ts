@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
+import { setMainWindow } from './windowManager'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -19,6 +20,8 @@ function createWindow(): void {
       nodeIntegration: false
     }
   })
+
+  setMainWindow(mainWindow)
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()

@@ -1,12 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useWorkareaStore } from './workarea'
+
+// Detect if we're running inside a child window
+const isChildWindow = new URLSearchParams(window.location.search).has('childWindow')
 
 export const useDialogStore = defineStore('dialog', () => {
   const createWorkareaVisible = ref(false)
   const importFileVisible = ref(false)
   const dataManageVisible = ref(false)
   const wellListVisible = ref(false)
-  const wellCurveVisible = ref(false)
+
   const exportFileVisible = ref(false)
   const aboutVisible = ref(false)
   const histogramVisible = ref(false)
@@ -48,6 +52,10 @@ export const useDialogStore = defineStore('dialog', () => {
   const horizonInterpolateVisible = ref(false)
   const horizonMergeVisible = ref(false)
   const horizonDecimateVisible = ref(false)
+  const compositeLogVisible = ref(false)
+
+  // Pre-set for composite log dialog (open a saved chart)
+  const compositeLogChartId = ref(0)
 
   // Pre-set data type for import/export dialog
   const importPresetType = ref('')
@@ -77,30 +85,52 @@ export const useDialogStore = defineStore('dialog', () => {
   }
 
   function showDataManage() {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      window.api.openChildWindow('dataManage', workareaStore.path)
+      return
+    }
     dataManageVisible.value = true
   }
 
   function showWellList() {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      window.api.openChildWindow('wellList', workareaStore.path)
+      return
+    }
     wellListVisible.value = true
   }
 
-  function showWellCurve() {
-    wellCurveVisible.value = true
-  }
 
   function showAbout() {
     aboutVisible.value = true
   }
 
   function showHistogram() {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      window.api.openChildWindow('histogram', workareaStore.path)
+      return
+    }
     histogramVisible.value = true
   }
 
   function showCrossplot() {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      window.api.openChildWindow('crossplot', workareaStore.path)
+      return
+    }
     crossplotVisible.value = true
   }
 
   function showWellDataQuery() {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      window.api.openChildWindow('wellDataQuery', workareaStore.path)
+      return
+    }
     wellDataQueryVisible.value = true
   }
 
@@ -127,6 +157,11 @@ export const useDialogStore = defineStore('dialog', () => {
   }
 
   function showSegyBrowse() {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      window.api.openChildWindow('segyBrowse', workareaStore.path || '')
+      return
+    }
     segyBrowseVisible.value = true
   }
 
@@ -135,10 +170,20 @@ export const useDialogStore = defineStore('dialog', () => {
   }
 
   function showSeismicDisplay() {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      window.api.openChildWindow('seismicDisplay', workareaStore.path)
+      return
+    }
     seismicDisplayVisible.value = true
   }
 
   function showBasemap() {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      window.api.openChildWindow('basemap', workareaStore.path)
+      return
+    }
     basemapVisible.value = true
   }
 
@@ -255,12 +300,30 @@ export const useDialogStore = defineStore('dialog', () => {
     horizonDecimateVisible.value = true
   }
 
+  let compositeLogSeq = 0
+
+  function showCompositeLog(chartId = 0) {
+    if (!isChildWindow) {
+      const workareaStore = useWorkareaStore()
+      // Use unique ID so each click opens a new window
+      const uniqueId = `compositeLog_${++compositeLogSeq}`
+      window.api.openChildWindow(
+        uniqueId,
+        workareaStore.path,
+        chartId ? JSON.stringify({ chartId }) : undefined
+      )
+      return
+    }
+    compositeLogChartId.value = chartId
+    compositeLogVisible.value = true
+  }
+
   function closeAllDialogs() {
     createWorkareaVisible.value = false
     importFileVisible.value = false
     dataManageVisible.value = false
     wellListVisible.value = false
-    wellCurveVisible.value = false
+
     exportFileVisible.value = false
     aboutVisible.value = false
     histogramVisible.value = false
@@ -302,6 +365,11 @@ export const useDialogStore = defineStore('dialog', () => {
     horizonInterpolateVisible.value = false
     horizonMergeVisible.value = false
     horizonDecimateVisible.value = false
+    compositeLogVisible.value = false
+    // Close all independent child windows
+    if (!isChildWindow) {
+      window.api.closeAllChildWindows?.()
+    }
   }
 
   return {
@@ -309,7 +377,6 @@ export const useDialogStore = defineStore('dialog', () => {
     importFileVisible,
     dataManageVisible,
     wellListVisible,
-    wellCurveVisible,
     exportFileVisible,
     aboutVisible,
     histogramVisible,
@@ -351,17 +418,18 @@ export const useDialogStore = defineStore('dialog', () => {
     horizonInterpolateVisible,
     horizonMergeVisible,
     horizonDecimateVisible,
+    compositeLogVisible,
     importPresetType,
     exportPresetType,
     curveCalculatorPreset,
     standardizePresetMethod,
     reservoirParamsPresetType,
+    compositeLogChartId,
     showCreateWorkarea,
     showImportFile,
     showExportFile,
     showDataManage,
     showWellList,
-    showWellCurve,
     showAbout,
     showHistogram,
     showCrossplot,
@@ -402,6 +470,7 @@ export const useDialogStore = defineStore('dialog', () => {
     showHorizonInterpolate,
     showHorizonMerge,
     showHorizonDecimate,
+    showCompositeLog,
     closeAllDialogs
   }
 })

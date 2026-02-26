@@ -37,7 +37,7 @@ function onToolClick(item: ToolBarItem) {
       requireWorkarea(() => dialogStore.showDataManage())
       break
     case 'tb-well-curve':
-      requireWorkarea(() => dialogStore.showWellCurve())
+      requireWorkarea(() => dialogStore.showCompositeLog())
       break
     case 'tb-histogram':
       requireWorkarea(() => dialogStore.showHistogram())

@@ -185,6 +185,17 @@ CREATE TABLE IF NOT EXISTS surveys (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Open child windows state (for workarea restore)
+CREATE TABLE IF NOT EXISTS open_windows (
+    window_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    pos_x REAL,
+    pos_y REAL,
+    width REAL,
+    height REAL,
+    preset_data TEXT DEFAULT '{}'
+);
+
 -- Seismic volumes table
 CREATE TABLE IF NOT EXISTS seismic_volumes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

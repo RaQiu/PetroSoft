@@ -2,8 +2,14 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as workareaApi from '@/api/workarea'
+import * as windowStateApi from '@/api/windowState'
 import type { RecentWorkarea } from '@/api/workarea'
 import { useWellStore } from './well'
+import { useDialogStore } from './dialog'
+import { CHILD_WINDOWS } from '@/config/windowConfig'
+
+// Detect if we're running inside a child window
+const isChildWindow = new URLSearchParams(window.location.search).has('childWindow')
 
 export const useWorkareaStore = defineStore('workarea', () => {
   const name = ref('')
@@ -51,6 +57,26 @@ export const useWorkareaStore = defineStore('workarea', () => {
       await wellStore.fetchWells(res.path)
       ElMessage.success(`工区 "${res.name}" 已打开，共 ${res.well_count} 口井`)
       fetchRecentWorkareas()
+
+      // Restore previously open child windows (main window only)
+      if (!isChildWindow) {
+        try {
+          const saved = await windowStateApi.getOpenWindows(res.path)
+          for (const w of saved) {
+            const def = CHILD_WINDOWS[w.window_id]
+            if (!def) continue
+            window.api.openChildWindow(
+              w.window_id,
+              res.path,
+              w.preset_data && w.preset_data !== '{}' ? w.preset_data : undefined,
+              w.width && w.height ? { width: w.width, height: w.height } : undefined,
+              w.pos_x != null && w.pos_y != null ? { x: w.pos_x, y: w.pos_y } : undefined
+            )
+          }
+        } catch {
+          // ignore restore errors — not critical
+        }
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '打开失败'
       ElMessage.error(msg)
@@ -64,7 +90,36 @@ export const useWorkareaStore = defineStore('workarea', () => {
     await openWorkareaFromPath(result.filePaths[0])
   }
 
-  function closeWorkarea() {
+  async function closeWorkarea() {
+    // Save child window states before closing (main window only)
+    if (!isChildWindow && path.value) {
+      try {
+        const states = await window.api.getChildWindowStates?.()
+        if (states?.length) {
+          await windowStateApi.saveWindowStates(
+            path.value,
+            states.map((s) => ({
+              window_id: s.windowId,
+              title: CHILD_WINDOWS[s.windowId]?.title || s.windowId,
+              pos_x: s.posX,
+              pos_y: s.posY,
+              width: s.width,
+              height: s.height,
+              preset_data: s.presetData || '{}'
+            }))
+          )
+        } else {
+          await windowStateApi.clearWindowStates(path.value)
+        }
+      } catch {
+        // ignore save errors
+      }
+      window.api.closeAllChildWindows?.()
+    }
+
+    const dialogStore = useDialogStore()
+    dialogStore.closeAllDialogs()
+
     name.value = ''
     path.value = ''
     isOpen.value = false

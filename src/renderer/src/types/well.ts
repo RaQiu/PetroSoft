@@ -50,7 +50,7 @@ export interface DataTypeOption {
 }
 
 export const DATA_TYPES: DataTypeOption[] = [
-  { label: '井位坐标', value: 'coordinates', needsWellName: false },
+  { label: '井位坐标', value: 'coordinates', needsWellName: true },
   { label: '井轨迹', value: 'trajectory', needsWellName: true },
   { label: '测井曲线', value: 'curves', needsWellName: true },
   { label: '分层', value: 'layers', needsWellName: false },

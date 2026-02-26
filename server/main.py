@@ -15,6 +15,7 @@ from api.tag import router as tag_router
 from api.task import router as task_router
 from api.chart import router as chart_router
 from api.horizon import router as horizon_router
+from api.window_state import router as window_state_router
 
 app = FastAPI(title="PetroSoft API", version="1.0.0")
 
@@ -39,3 +40,4 @@ app.include_router(tag_router, prefix="/api")
 app.include_router(task_router, prefix="/api")
 app.include_router(chart_router, prefix="/api")
 app.include_router(horizon_router, prefix="/api")
+app.include_router(window_state_router, prefix="/api")

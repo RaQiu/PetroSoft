@@ -196,7 +196,7 @@ export const menuConfig: MenuGroup[] = [
           { id: 'well.new-group.by-type', label: '按类型' }
         ]
       },
-      { id: 'well.curve-edit', label: '曲线编辑' },
+      { id: 'well.curve-edit', label: '井曲线' },
       { id: 'well.outlier', label: '异常值处理' },
       { id: 'well.resample', label: '曲线重采样' },
       { id: 'well.baseline', label: '基线校正' },
