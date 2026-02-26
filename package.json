@@ -33,6 +33,7 @@
     ]
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^7.6.1",
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@electron-toolkit/utils": "^3.0.0",
@@ -40,6 +41,7 @@
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
+    "eslint": "^10.0.2",
     "sass": "^1.83.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
