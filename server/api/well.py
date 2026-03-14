@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from db import get_connection
 from models import (
+    DeleteCurvePointsRequest,
     UpdateWellRequest,
     UpdateCurveRequest,
     CreateLayerRequest,
@@ -388,6 +389,52 @@ async def delete_curve(
         await db.execute("DELETE FROM curves WHERE id = ?", (curve_id,))
         await db.commit()
     return {"status": "ok"}
+
+
+@router.post("/{well_name}/curve-points/delete")
+async def delete_curve_points(well_name: str, req: DeleteCurvePointsRequest):
+    """Delete selected curve/discrete points by curve name and depth."""
+    async with get_connection(req.workarea_path) as db:
+        cursor = await db.execute("SELECT id FROM wells WHERE name = ?", (well_name,))
+        well = await cursor.fetchone()
+        if not well:
+            raise HTTPException(status_code=404, detail=f"井 '{well_name}' 不存在")
+
+        well_id = well[0]
+        deleted_total = 0
+
+        for item in req.items:
+            depths = sorted({round(depth, 6) for depth in item.depths})
+            if not depths:
+                continue
+
+            placeholders = ",".join(["?"] * len(depths))
+
+            curve_cursor = await db.execute(
+                "SELECT id FROM curves WHERE well_id = ? AND name = ?",
+                (well_id, item.curve_name),
+            )
+            curve_rows = await curve_cursor.fetchall()
+            for row in curve_rows:
+                await db.execute(
+                    f"DELETE FROM curve_data WHERE curve_id = ? AND ROUND(depth, 6) IN ({placeholders})",
+                    [row[0], *depths],
+                )
+                changes_cursor = await db.execute("SELECT changes()")
+                changes_row = await changes_cursor.fetchone()
+                deleted_total += int(changes_row[0] or 0)
+
+            await db.execute(
+                f"DELETE FROM discrete_curves WHERE well_id = ? AND curve_name = ? AND ROUND(depth, 6) IN ({placeholders})",
+                [well_id, item.curve_name, *depths],
+            )
+            changes_cursor = await db.execute("SELECT changes()")
+            changes_row = await changes_cursor.fetchone()
+            deleted_total += int(changes_row[0] or 0)
+
+        await db.commit()
+
+    return {"status": "ok", "deleted_count": deleted_total}
 
 
 # ── Layer CRUD ───────────────────────────────────────────────────────

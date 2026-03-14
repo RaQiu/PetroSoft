@@ -8,8 +8,10 @@ const isChildWindow = new URLSearchParams(window.location.search).has('childWind
 export const useDialogStore = defineStore('dialog', () => {
   const createWorkareaVisible = ref(false)
   const importFileVisible = ref(false)
+  const importImageVisible = ref(false)
   const dataManageVisible = ref(false)
   const wellListVisible = ref(false)
+  const wellCurveVisible = ref(false)
 
   const exportFileVisible = ref(false)
   const aboutVisible = ref(false)
@@ -59,6 +61,10 @@ export const useDialogStore = defineStore('dialog', () => {
 
   // Pre-set data type for import/export dialog
   const importPresetType = ref('')
+  const importPresetFilePath = ref('')
+  const importPresetWellName = ref('')
+  const importImagePresetFilePath = ref('')
+  const importImagePresetName = ref('')
   const exportPresetType = ref('')
 
   // Pre-set for curve calculator (e.g. impedance calculation)
@@ -74,9 +80,17 @@ export const useDialogStore = defineStore('dialog', () => {
     createWorkareaVisible.value = true
   }
 
-  function showImportFile(presetType = '') {
+  function showImportFile(presetType = '', presetFilePath = '', presetWellName = '') {
     importPresetType.value = presetType
+    importPresetFilePath.value = presetFilePath
+    importPresetWellName.value = presetWellName
     importFileVisible.value = true
+  }
+
+  function showImportImage(presetFilePath = '', presetName = '') {
+    importImagePresetFilePath.value = presetFilePath
+    importImagePresetName.value = presetName
+    importImageVisible.value = true
   }
 
   function showExportFile(presetType = '') {
@@ -321,8 +335,10 @@ export const useDialogStore = defineStore('dialog', () => {
   function closeAllDialogs() {
     createWorkareaVisible.value = false
     importFileVisible.value = false
+    importImageVisible.value = false
     dataManageVisible.value = false
     wellListVisible.value = false
+    wellCurveVisible.value = false
 
     exportFileVisible.value = false
     aboutVisible.value = false
@@ -373,10 +389,12 @@ export const useDialogStore = defineStore('dialog', () => {
   }
 
   return {
-    createWorkareaVisible,
-    importFileVisible,
-    dataManageVisible,
-    wellListVisible,
+        createWorkareaVisible,
+        importFileVisible,
+        importImageVisible,
+        dataManageVisible,
+        wellListVisible,
+        wellCurveVisible,
     exportFileVisible,
     aboutVisible,
     histogramVisible,
@@ -418,16 +436,21 @@ export const useDialogStore = defineStore('dialog', () => {
     horizonInterpolateVisible,
     horizonMergeVisible,
     horizonDecimateVisible,
-    compositeLogVisible,
-    importPresetType,
-    exportPresetType,
+        compositeLogVisible,
+        importPresetType,
+        importPresetFilePath,
+        importPresetWellName,
+        importImagePresetFilePath,
+        importImagePresetName,
+        exportPresetType,
     curveCalculatorPreset,
     standardizePresetMethod,
     reservoirParamsPresetType,
     compositeLogChartId,
-    showCreateWorkarea,
-    showImportFile,
-    showExportFile,
+        showCreateWorkarea,
+        showImportFile,
+        showImportImage,
+        showExportFile,
     showDataManage,
     showWellList,
     showAbout,

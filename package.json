@@ -9,10 +9,15 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
+    "build:server": "cd server && pyinstaller petrosoft_server.spec --clean",
     "build:unpack": "pnpm build && electron-builder --dir",
     "build:win": "pnpm build && electron-builder --win",
     "build:mac": "pnpm build && electron-builder --mac",
-    "build:linux": "pnpm build && electron-builder --linux"
+    "build:linux": "pnpm build && electron-builder --linux",
+    "build:all": "pnpm build:server && pnpm build",
+    "dist:win": "pnpm build:server && pnpm build:win",
+    "dist:mac": "pnpm build:server && pnpm build:mac",
+    "dist:linux": "pnpm build:server && pnpm build:linux"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

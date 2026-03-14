@@ -7,6 +7,7 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import router from './router'
 import App from './App.vue'
 import './assets/styles/global.scss'
+import { initApiClient } from './api/client'
 
 const app = createApp(App)
 
@@ -18,4 +19,8 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
-app.mount('#app')
+
+// Initialize API client with dynamic backend port, then mount
+initApiClient().finally(() => {
+  app.mount('#app')
+})

@@ -5,6 +5,8 @@
         <el-select v-model="filterType" placeholder="全部类型" size="small" clearable style="width: 140px">
           <el-option label="直方图" value="histogram" />
           <el-option label="交会图" value="crossplot" />
+          <el-option label="综合柱状图" value="composite_log" />
+          <el-option label="裂缝图片" value="fracture_image" />
         </el-select>
         <el-input v-model="searchText" placeholder="搜索名称" size="small" clearable style="width: 200px" />
       </div>
@@ -65,7 +67,9 @@ import type { ChartInfo } from '@/api/chart'
 
 const CHART_LABELS: Record<string, string> = {
   histogram: '直方图',
-  crossplot: '交会图'
+  crossplot: '交会图',
+  composite_log: '综合柱状图',
+  fracture_image: '裂缝图片'
 }
 
 const workareaStore = useWorkareaStore()
@@ -123,10 +127,35 @@ async function loadThumbnail(chartId: number) {
   }
 }
 
+function resolveChartImageSource(detail: Awaited<ReturnType<typeof getChart>>): string {
+  if (detail.chart_type !== 'fracture_image') {
+    return detail.thumbnail || ''
+  }
+  try {
+    const parsed = JSON.parse(detail.config || '{}') as Partial<{ src: string }>
+    return typeof parsed.src === 'string' && parsed.src ? parsed.src : detail.thumbnail || ''
+  }
+  catch {
+    return detail.thumbnail || ''
+  }
+}
+
+function inferDownloadExtension(src: string): string {
+  const matched = src.match(/^data:image\/([a-zA-Z0-9+.-]+);/)
+  const ext = matched?.[1]?.toLowerCase()
+  if (!ext) {
+    return 'png'
+  }
+  if (ext === 'svg+xml') {
+    return 'svg'
+  }
+  return ext.replace('jpeg', 'jpg')
+}
+
 async function previewChart(chart: ChartInfo) {
   try {
     const detail = await getChart(workareaStore.path, chart.id)
-    previewSrc.value = detail.thumbnail || ''
+    previewSrc.value = resolveChartImageSource(detail)
     previewVisible.value = true
   } catch {
     ElMessage.error('加载预览失败')
@@ -136,13 +165,14 @@ async function previewChart(chart: ChartInfo) {
 async function exportChart(chart: ChartInfo) {
   try {
     const detail = await getChart(workareaStore.path, chart.id)
-    if (!detail.thumbnail) {
+    const source = resolveChartImageSource(detail)
+    if (!source) {
       ElMessage.warning('无缩略图可导出')
       return
     }
     const a = document.createElement('a')
-    a.href = detail.thumbnail
-    a.download = `${chart.name}.png`
+    a.href = source
+    a.download = `${chart.name}.${inferDownloadExtension(source)}`
     a.click()
     ElMessage.success('已导出')
   } catch {

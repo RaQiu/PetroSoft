@@ -416,11 +416,12 @@ async function saveAsResult() {
   const chart = (chartRef.value as unknown as { chart: { getDataURL: (opts: Record<string, unknown>) => string } }).chart
   if (!chart) return
   try {
-    const { value: name } = await ElMessageBox.prompt('请输入成果图名称', '保存成果图', {
+    const promptResult = await ElMessageBox.prompt('请输入成果图名称', '保存成果图', {
       inputValue: `交会图_${xCurve.value}_${yCurve.value}`,
       confirmButtonText: '保存',
       cancelButtonText: '取消'
-    })
+    }) as { value?: string }
+    const name = typeof promptResult.value === 'string' ? promptResult.value : ''
     if (!name) return
     const thumbnail = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' })
     await saveChart(workareaStore.path, name, 'crossplot', thumbnail, '{}')

@@ -6,12 +6,25 @@ export type TrackType
     | 'lithology' // 岩性花纹
     | 'curve' // 连续曲线（支持多条叠加）
     | 'discrete' // 离散曲线
+    | 'fracture' // 裂缝图片道
     | 'interpretation' // 测井解释结论
     | 'mineral' // 矿物百分比堆叠
     | 'text' // 综合结论文本
 
 export type LineStyleType = 'solid' | 'dashed' | 'dotted'
 export type DrawMode = 'line' | 'bar'
+
+export interface CurveColorRamp {
+  low: string
+  mid: string
+  high: string
+}
+
+export const DEFAULT_CURVE_COLOR_RAMP: CurveColorRamp = {
+  low: '#1e88e5',
+  mid: '#fdd835',
+  high: '#e53935',
+}
 
 /** 单条曲线在道内的显示样式 */
 export interface CurveStyle {
@@ -20,12 +33,19 @@ export interface CurveStyle {
   lineWidth: number
   lineStyle: LineStyleType
   drawMode?: DrawMode // 默认 'line'
+  valueColoring?: boolean
+  colorRamp?: CurveColorRamp
   unit?: string
   min: number
   max: number
   logarithmic?: boolean
   /** 面积填充: color 填充色, direction 填充方向 */
-  fill?: { color: string, direction: 'left' | 'right' }
+  fill?: { color: string, direction: 'left' | 'right', customColor?: boolean, opacity?: number }
+  /** 表头文字样式 */
+  fontSize?: number // 默认 9
+  fontColor?: string // 默认 '#333'
+  fontBold?: boolean
+  fontItalic?: boolean
 }
 
 /** 网格配置 */
@@ -66,6 +86,17 @@ export interface TextSegment {
   color?: string
 }
 
+export interface FractureImageConfig {
+  id: string
+  name: string
+  src: string
+  leftRatio: number
+  rightRatio: number
+  topDepth: number
+  bottomDepth: number
+  opacity?: number
+}
+
 /** 单个道的配置 */
 export interface TrackConfig {
   id: string
@@ -78,6 +109,7 @@ export interface TrackConfig {
   bgColor?: string // 道背景色
   mineralCurves?: MineralCurveConfig[] // type='mineral' 用
   textContent?: TextSegment[] // type='text' 用
+  fractureImages?: FractureImageConfig[] // type='fracture' 用
 }
 
 /** 整图配置（序列化到 result_charts.config） */
@@ -93,44 +125,8 @@ export interface CompositeLogConfig {
 // ── 岩性关键词 → 花纹 ──
 // 岩性描述往往是 "灰黑色荧光泥岩" 等长文本，需要关键词匹配
 
-export interface LithologyPatternDef {
-  keywords: string[] // 任一关键词命中即匹配
-  patternType: string // 花纹绘制器名
-  color: string // 底色
-  label: string // 图例标注
-}
-
-/**
- * 按优先级排列：先匹配更具体的（如"泥页岩"先于"泥岩"）
- */
-export const LITHOLOGY_PATTERNS: LithologyPatternDef[] = [
-  { keywords: ['砾岩'], patternType: 'conglomerate', color: '#FFE4B5', label: '砾岩' },
-  { keywords: ['粗砂岩'], patternType: 'sandstone_coarse', color: '#FFDEAD', label: '粗砂岩' },
-  { keywords: ['中砂岩'], patternType: 'sandstone_medium', color: '#FFFACD', label: '中砂岩' },
-  { keywords: ['细砂岩'], patternType: 'sandstone_fine', color: '#FFF8DC', label: '细砂岩' },
-  { keywords: ['粉砂岩'], patternType: 'siltstone', color: '#F5DEB3', label: '粉砂岩' },
-  { keywords: ['泥质砂岩'], patternType: 'muddy_sandstone', color: '#DEB887', label: '泥质砂岩' },
-  { keywords: ['砂质泥岩'], patternType: 'sandy_mudstone', color: '#C0C0C0', label: '砂质泥岩' },
-  { keywords: ['泥页岩', '页岩'], patternType: 'shale', color: '#778899', label: '页岩' },
-  { keywords: ['泥岩'], patternType: 'mudstone', color: '#A9A9A9', label: '泥岩' },
-  { keywords: ['白云岩'], patternType: 'dolomite', color: '#DDA0DD', label: '白云岩' },
-  { keywords: ['泥灰岩'], patternType: 'marl', color: '#B0C4DE', label: '泥灰岩' },
-  { keywords: ['石灰岩', '灰岩', '钙质'], patternType: 'limestone', color: '#87CEEB', label: '石灰岩' },
-  { keywords: ['煤'], patternType: 'coal', color: '#2F4F4F', label: '煤层' },
-  { keywords: ['砂岩'], patternType: 'sandstone', color: '#FFFACD', label: '砂岩' },
-]
-
-/**
- * 根据岩性文本描述匹配花纹定义
- */
-export function matchLithology(description: string): LithologyPatternDef | null {
-  for (const def of LITHOLOGY_PATTERNS) {
-    if (def.keywords.some(kw => description.includes(kw))) {
-      return def
-    }
-  }
-  return null
-}
+// LithologyPatternDef kept for backward compat but no longer used for rendering.
+// Pattern matching is now in lithologyPatterns.ts (matchLithologyId → 301 GB/T 958 patterns)
 
 // ── 解释结论颜色 ──
 
@@ -174,11 +170,14 @@ export interface CurvePreset {
 }
 
 export const CURVE_PRESETS: Record<string, CurvePreset> = {
-  井径: { min: 150, max: 350, color: '#000000', lineWidth: 1, unit: 'mm' },
-  自然电位: { min: -100, max: 100, color: '#0000FF', lineWidth: 1, unit: 'mV' },
+  井径: { min: 0, max: 50, color: '#000000', lineWidth: 1, unit: 'cm' },
+  自然电位: { min: -300, max: 300, color: '#0000FF', lineWidth: 1, unit: 'mV' },
   自然伽马: { min: 0, max: 200, color: '#008000', lineWidth: 1, unit: 'API' },
   浅侧向: { min: 0.1, max: 10000, color: '#FF0000', lineWidth: 1, unit: 'Ωm', logarithmic: true },
   深侧向: { min: 0.1, max: 10000, color: '#800000', lineWidth: 1, unit: 'Ωm', logarithmic: true },
+  浅电阻: { min: 0.1, max: 10000, color: '#FF0000', lineWidth: 1, unit: 'Ωm', logarithmic: true },
+  深电阻: { min: 0.1, max: 10000, color: '#800000', lineWidth: 1, unit: 'Ωm', logarithmic: true },
+  电阻率: { min: 0.1, max: 10000, color: '#FF0000', lineWidth: 1, unit: 'Ωm', logarithmic: true },
   DT: { min: 40, max: 140, color: '#FF00FF', lineWidth: 1, unit: 'μs/ft' },
   补偿中子孔隙度: { min: 0, max: 60, color: '#0000CD', lineWidth: 1, unit: '%' },
   岩性密度: { min: 1.5, max: 3.0, color: '#8B0000', lineWidth: 1, unit: 'g/cm³' },
@@ -189,27 +188,200 @@ export const CURVE_PRESETS: Record<string, CurvePreset> = {
   SP: { min: -100, max: 100, color: '#0000FF', lineWidth: 1, unit: 'mV' },
   AC: { min: 40, max: 140, color: '#FF00FF', lineWidth: 1, unit: 'μs/ft' },
   RT: { min: 0.1, max: 10000, color: '#FF0000', lineWidth: 1, unit: 'Ωm', logarithmic: true },
-  CAL: { min: 150, max: 350, color: '#000000', lineWidth: 1, unit: 'mm' },
+  CAL: { min: 0, max: 50, color: '#000000', lineWidth: 1, unit: 'cm' },
+  CALI: { min: 0, max: 50, color: '#000000', lineWidth: 1, unit: 'cm' },
+  CALI1: { min: 0, max: 50, color: '#000000', lineWidth: 1, unit: 'cm' },
   DEN: { min: 1.5, max: 3.0, color: '#8B0000', lineWidth: 1, unit: 'g/cm³' },
   CNL: { min: 0, max: 60, color: '#0000CD', lineWidth: 1, unit: '%' },
+}
+
+const LEGACY_CURVE_PRESETS: Record<string, Pick<CurvePreset, 'min' | 'max' | 'unit'>> = {
+  井径: { min: 150, max: 350, unit: 'mm' },
+  CAL: { min: 150, max: 350, unit: 'mm' },
+  CALI: { min: 150, max: 350, unit: 'mm' },
+  CALI1: { min: 150, max: 350, unit: 'mm' },
+  自然电位: { min: -100, max: 100, unit: 'mV' },
+  SP: { min: -100, max: 100, unit: 'mV' },
+}
+
+const CURVE_PRESET_ALIASES: Array<{ key: string, aliases: string[] }> = [
+  { key: '井径', aliases: ['井径', 'CAL', 'CALI', 'CALI1', '井眼', '井眼直径'] },
+  { key: '自然电位', aliases: ['自然电位', 'SP', '电位', '自然电位SP'] },
+  { key: '自然伽马', aliases: ['自然伽马', 'GR', '伽马'] },
+  { key: '浅侧向', aliases: ['浅侧向', '浅电阻', '浅电阻率', 'RLLS', 'LLS'] },
+  { key: '深侧向', aliases: ['深侧向', '深电阻', '深电阻率', 'RT', 'RLLD', 'LLD', '电阻率'] },
+  { key: 'DT', aliases: ['DT', 'AC', '声波', '声波时差'] },
+  { key: '补偿中子孔隙度', aliases: ['补偿中子孔隙度', 'CNL', '中子', '中子孔隙度'] },
+  { key: '岩性密度', aliases: ['岩性密度', 'DEN', '密度'] },
+  { key: '孔隙度', aliases: ['孔隙度', 'PHI', 'POR'] },
+  { key: '测井TOC', aliases: ['测井TOC', 'TOC'] },
+  { key: '脆性指数', aliases: ['脆性指数', 'BI'] },
+]
+
+export function resolveCurvePresetKey(curveName: string): string | null {
+  if (CURVE_PRESETS[curveName]) {
+    return curveName
+  }
+  const normalized = curveName.trim().toUpperCase()
+  for (const group of CURVE_PRESET_ALIASES) {
+    if (group.aliases.some(alias => normalized === alias.toUpperCase())) {
+      return group.key
+    }
+  }
+  for (const group of CURVE_PRESET_ALIASES) {
+    if (group.aliases.some(alias => normalized.includes(alias.toUpperCase()))) {
+      return group.key
+    }
+  }
+  return null
+}
+
+export function getCurvePreset(curveName: string): CurvePreset | undefined {
+  const presetKey = resolveCurvePresetKey(curveName)
+  return presetKey ? CURVE_PRESETS[presetKey] : undefined
+}
+
+export function normalizeCurveStyle(curveStyle: CurveStyle): CurveStyle {
+  const normalized: CurveStyle = {
+    ...curveStyle,
+    valueColoring: curveStyle.valueColoring ?? true,
+    colorRamp: curveStyle.colorRamp ? { ...curveStyle.colorRamp } : { ...DEFAULT_CURVE_COLOR_RAMP },
+    fill: curveStyle.fill
+      ? {
+          ...curveStyle.fill,
+          customColor: curveStyle.fill.customColor ?? (curveStyle.fill.color !== curveStyle.color),
+          opacity: Math.max(0, Math.min(1, curveStyle.fill.opacity ?? 1)),
+        }
+      : undefined,
+  }
+  const presetKey = resolveCurvePresetKey(curveStyle.curveName)
+  if (presetKey) {
+    const preset = CURVE_PRESETS[presetKey]
+    const legacyPreset = LEGACY_CURVE_PRESETS[curveStyle.curveName] || LEGACY_CURVE_PRESETS[presetKey]
+    const isLegacyRange = !!legacyPreset
+      && curveStyle.min === legacyPreset.min
+      && curveStyle.max === legacyPreset.max
+      && (curveStyle.unit || legacyPreset.unit) === legacyPreset.unit
+
+    if (!normalized.unit) {
+      normalized.unit = preset.unit
+    }
+    if (normalized.logarithmic === undefined && preset.logarithmic !== undefined) {
+      normalized.logarithmic = preset.logarithmic
+    }
+    if (isLegacyRange) {
+      normalized.min = preset.min
+      normalized.max = preset.max
+      normalized.unit = preset.unit
+      normalized.logarithmic = preset.logarithmic
+    }
+  }
+  if (!Number.isFinite(normalized.min)) {
+    normalized.min = 0
+  }
+  if (!Number.isFinite(normalized.max)) {
+    normalized.max = normalized.min + 1
+  }
+  if (normalized.logarithmic) {
+    if (normalized.max <= 0) {
+      normalized.max = 10
+    }
+    if (normalized.min <= 0) {
+      normalized.min = Math.max(0.1, normalized.max / 1000)
+    }
+    if (normalized.max <= normalized.min) {
+      normalized.max = normalized.min * 10
+    }
+  }
+  else if (normalized.max <= normalized.min) {
+    normalized.max = normalized.min + 1
+  }
+  return normalized
+}
+
+export function normalizeFractureImage(image: FractureImageConfig): FractureImageConfig {
+  let leftRatio = Number.isFinite(image.leftRatio) ? image.leftRatio : 0.1
+  let rightRatio = Number.isFinite(image.rightRatio) ? image.rightRatio : 0.9
+  if (rightRatio < leftRatio) {
+    [leftRatio, rightRatio] = [rightRatio, leftRatio]
+  }
+  let widthRatio = Math.max(0.08, rightRatio - leftRatio)
+  widthRatio = Math.min(widthRatio, 1)
+  leftRatio = Math.max(0, Math.min(leftRatio, 1 - widthRatio))
+  rightRatio = leftRatio + widthRatio
+
+  let topDepth = Number.isFinite(image.topDepth) ? image.topDepth : 0
+  let bottomDepth = Number.isFinite(image.bottomDepth) ? image.bottomDepth : topDepth + 10
+  if (bottomDepth < topDepth) {
+    [topDepth, bottomDepth] = [bottomDepth, topDepth]
+  }
+  if (bottomDepth <= topDepth) {
+    bottomDepth = topDepth + 1
+  }
+
+  return {
+    ...image,
+    name: image.name || '裂缝图片',
+    leftRatio,
+    rightRatio,
+    topDepth,
+    bottomDepth,
+    opacity: Math.max(0.1, Math.min(1, image.opacity ?? 1)),
+  }
+}
+
+export function normalizeTracksCurveStyles(tracks: TrackConfig[]): TrackConfig[] {
+  return tracks.map((track) => {
+    return {
+      ...track,
+      curves: track.curves?.map(normalizeCurveStyle),
+      fractureImages: track.fractureImages?.map(normalizeFractureImage),
+    }
+  })
+}
+
+function findCurveName(curveNames: string[], aliases: string[]): string | null {
+  const normalizedAliases = aliases.map(alias => alias.toUpperCase())
+  for (const curveName of curveNames) {
+    if (normalizedAliases.includes(curveName.trim().toUpperCase())) {
+      return curveName
+    }
+  }
+  for (const curveName of curveNames) {
+    const normalized = curveName.trim().toUpperCase()
+    if (normalizedAliases.some(alias => normalized.includes(alias))) {
+      return curveName
+    }
+  }
+  return null
 }
 
 // ── 工厂函数 ──
 
 let _trackIdCounter = 0
 
+function nextEntityId(prefix: string): string {
+  return `${prefix}_${++_trackIdCounter}_${Date.now()}`
+}
+
 export function nextTrackId(): string {
-  return `track_${++_trackIdCounter}_${Date.now()}`
+  return nextEntityId('track')
+}
+
+export function nextFractureImageId(): string {
+  return nextEntityId('fracture_img')
 }
 
 export function createDefaultCurveStyle(curveName: string): CurveStyle {
-  const preset = CURVE_PRESETS[curveName]
+  const preset = getCurvePreset(curveName)
   if (preset) {
     return {
       curveName,
       color: preset.color,
       lineWidth: preset.lineWidth,
       lineStyle: 'solid',
+      valueColoring: true,
+      colorRamp: { ...DEFAULT_CURVE_COLOR_RAMP },
       unit: preset.unit,
       min: preset.min,
       max: preset.max,
@@ -221,6 +393,8 @@ export function createDefaultCurveStyle(curveName: string): CurveStyle {
     color: '#000000',
     lineWidth: 1,
     lineStyle: 'solid',
+    valueColoring: true,
+    colorRamp: { ...DEFAULT_CURVE_COLOR_RAMP },
     min: 0,
     max: 100,
   }
@@ -243,7 +417,6 @@ export function createEmptyConfig(wellName: string, depthRange: { min: number, m
  * 推荐道布局 —— 模仿专业综合柱状图（仅手动触发，不自动调用）
  */
 export function createSuggestedTracks(curveNames: string[]): TrackConfig[] {
-  const has = (name: string) => curveNames.includes(name)
   const tracks: TrackConfig[] = []
 
   // 1. 地层
@@ -258,10 +431,12 @@ export function createSuggestedTracks(curveNames: string[]): TrackConfig[] {
   // 4. 井径 + 自然电位
   {
     const curves: CurveStyle[] = []
-    if (has('井径') || has('CAL'))
-      curves.push(createDefaultCurveStyle(has('井径') ? '井径' : 'CAL'))
-    if (has('自然电位') || has('SP'))
-      curves.push(createDefaultCurveStyle(has('自然电位') ? '自然电位' : 'SP'))
+    const caliper = findCurveName(curveNames, ['井径', 'CAL', 'CALI', 'CALI1', '井眼', '井眼直径'])
+    const spontaneous = findCurveName(curveNames, ['自然电位', 'SP', '电位', '自然电位SP'])
+    if (caliper)
+      curves.push(createDefaultCurveStyle(caliper))
+    if (spontaneous)
+      curves.push(createDefaultCurveStyle(spontaneous))
     if (curves.length) {
       tracks.push({ id: nextTrackId(), type: 'curve', title: '井径/自然电位', width: 140, visible: true, curves })
     }
@@ -270,10 +445,12 @@ export function createSuggestedTracks(curveNames: string[]): TrackConfig[] {
   // 5. 自然伽马 + 声波
   {
     const curves: CurveStyle[] = []
-    if (has('自然伽马') || has('GR'))
-      curves.push(createDefaultCurveStyle(has('自然伽马') ? '自然伽马' : 'GR'))
-    if (has('DT') || has('AC'))
-      curves.push(createDefaultCurveStyle(has('DT') ? 'DT' : 'AC'))
+    const gamma = findCurveName(curveNames, ['自然伽马', 'GR', '伽马'])
+    const sonic = findCurveName(curveNames, ['DT', 'AC', '声波', '声波时差'])
+    if (gamma)
+      curves.push(createDefaultCurveStyle(gamma))
+    if (sonic)
+      curves.push(createDefaultCurveStyle(sonic))
     if (curves.length) {
       tracks.push({ id: nextTrackId(), type: 'curve', title: '伽马/声波', width: 140, visible: true, curves })
     }
@@ -282,12 +459,15 @@ export function createSuggestedTracks(curveNames: string[]): TrackConfig[] {
   // 6. 电阻率
   {
     const curves: CurveStyle[] = []
-    if (has('浅侧向'))
-      curves.push(createDefaultCurveStyle('浅侧向'))
-    if (has('深侧向'))
-      curves.push(createDefaultCurveStyle('深侧向'))
-    if (has('RT'))
-      curves.push(createDefaultCurveStyle('RT'))
+    const shallow = findCurveName(curveNames, ['浅侧向', '浅电阻', '浅电阻率', 'RLLS', 'LLS'])
+    const deep = findCurveName(curveNames, ['深侧向', '深电阻', '深电阻率', 'RLLD', 'LLD'])
+    const rt = findCurveName(curveNames, ['RT', '电阻率'])
+    if (shallow)
+      curves.push(createDefaultCurveStyle(shallow))
+    if (deep)
+      curves.push(createDefaultCurveStyle(deep))
+    if (rt && rt !== deep)
+      curves.push(createDefaultCurveStyle(rt))
     if (curves.length) {
       tracks.push({ id: nextTrackId(), type: 'curve', title: '电阻率', width: 140, visible: true, curves })
     }
@@ -296,12 +476,15 @@ export function createSuggestedTracks(curveNames: string[]): TrackConfig[] {
   // 7. 孔隙度 + 密度 + 中子
   {
     const curves: CurveStyle[] = []
-    if (has('岩性密度') || has('DEN'))
-      curves.push(createDefaultCurveStyle(has('岩性密度') ? '岩性密度' : 'DEN'))
-    if (has('补偿中子孔隙度') || has('CNL'))
-      curves.push(createDefaultCurveStyle(has('补偿中子孔隙度') ? '补偿中子孔隙度' : 'CNL'))
-    if (has('孔隙度'))
-      curves.push(createDefaultCurveStyle('孔隙度'))
+    const density = findCurveName(curveNames, ['岩性密度', 'DEN', '密度'])
+    const neutron = findCurveName(curveNames, ['补偿中子孔隙度', 'CNL', '中子', '中子孔隙度'])
+    const porosity = findCurveName(curveNames, ['孔隙度', 'PHI', 'POR'])
+    if (density)
+      curves.push(createDefaultCurveStyle(density))
+    if (neutron)
+      curves.push(createDefaultCurveStyle(neutron))
+    if (porosity)
+      curves.push(createDefaultCurveStyle(porosity))
     if (curves.length) {
       tracks.push({ id: nextTrackId(), type: 'curve', title: '密度/中子/孔隙', width: 140, visible: true, curves })
     }
@@ -310,17 +493,19 @@ export function createSuggestedTracks(curveNames: string[]): TrackConfig[] {
   // 8. TOC + 脆性
   {
     const curves: CurveStyle[] = []
-    if (has('测井TOC'))
-      curves.push(createDefaultCurveStyle('测井TOC'))
-    if (has('脆性指数'))
-      curves.push(createDefaultCurveStyle('脆性指数'))
+    const toc = findCurveName(curveNames, ['测井TOC', 'TOC'])
+    const brittleness = findCurveName(curveNames, ['脆性指数', 'BI'])
+    if (toc)
+      curves.push(createDefaultCurveStyle(toc))
+    if (brittleness)
+      curves.push(createDefaultCurveStyle(brittleness))
     if (curves.length) {
       tracks.push({ id: nextTrackId(), type: 'curve', title: 'TOC/脆性', width: 140, visible: true, curves })
     }
   }
 
   // 9. 解释结论
-  tracks.push({ id: nextTrackId(), type: 'interpretation', title: '解释结论', width: 80, visible: true })
+  tracks.push({ id: nextTrackId(), type: 'interpretation', title: '解释结论', width: 96, visible: true })
 
   return tracks
 }

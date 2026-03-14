@@ -9,6 +9,11 @@ files:
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!server/*'
+extraResources:
+  - from: "server/dist/petrosoft-server"
+    to: "petrosoft-server"
+    filter:
+      - "**/*"
 win:
   executableName: PetroSoft
 nsis:
@@ -27,7 +32,6 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
   maintainer: petrosoft.com
   category: Science

@@ -6,6 +6,16 @@
 
   <!-- Normal main window mode -->
   <div v-else class="app-container">
+    <div v-if="dragOverlayVisible" class="app-drop-overlay">
+      <div class="app-drop-card">
+        <div class="app-drop-title">
+          释放文件开始导入
+        </div>
+        <div class="app-drop-subtitle">
+          数据文件将自动识别类型，图片将进入成果集
+        </div>
+      </div>
+    </div>
     <TitleBar />
     <template v-if="workareaStore.isOpen">
       <MenuBar />
@@ -20,6 +30,7 @@
     <!-- Dialogs (always mounted so they can be triggered) -->
     <CreateWorkareaDialog />
     <ImportFileDialog />
+    <ImportImageDialog />
     <ExportFileDialog />
     <DataManageDialog />
     <WellListDialog />
@@ -68,10 +79,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, defineAsyncComponent, onMounted, nextTick, type Component } from 'vue'
+import { ElMessage } from 'element-plus'
+import { ref, watch, defineAsyncComponent, onBeforeUnmount, onMounted, nextTick, type Component } from 'vue'
+import { detectImportFile } from '@/api/data'
 import { useWorkareaStore } from '@/stores/workarea'
 import { useDialogStore } from '@/stores/dialog'
 import { useWellStore } from '@/stores/well'
+import { DATA_TYPES } from '@/types/well'
 import { CHILD_WINDOWS } from '@/config/windowConfig'
 import TitleBar from '@/components/layout/TitleBar.vue'
 import MenuBar from '@/components/layout/MenuBar.vue'
@@ -81,6 +95,7 @@ import StatusBar from '@/components/layout/StatusBar.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
 import CreateWorkareaDialog from '@/components/dialogs/CreateWorkareaDialog.vue'
 import ImportFileDialog from '@/components/dialogs/ImportFileDialog.vue'
+import ImportImageDialog from '@/components/dialogs/ImportImageDialog.vue'
 import ExportFileDialog from '@/components/dialogs/ExportFileDialog.vue'
 import DataManageDialog from '@/components/dialogs/DataManageDialog.vue'
 import WellListDialog from '@/components/dialogs/WellListDialog.vue'
@@ -128,11 +143,114 @@ import CompositeLogWindow from '@/components/dialogs/CompositeLogWindow.vue'
 
 const workareaStore = useWorkareaStore()
 const dialogStore = useDialogStore()
+const dragOverlayVisible = ref(false)
+const dragDepth = ref(0)
 
 // --- Child window mode detection ---
 const params = new URLSearchParams(window.location.search)
 const childWindowId = ref(params.get('childWindow') || '')
 const childComponent = ref<Component | null>(null)
+
+function inferFileStem(filePath: string): string {
+  const filename = filePath.split(/[\\/]/).pop() || ''
+  return filename.replace(/\.[^.]+$/, '')
+}
+
+function getDataTypeLabel(dataType: string): string {
+  return DATA_TYPES.find(item => item.value === dataType)?.label || dataType
+}
+
+async function openDroppedFile(filePath: string) {
+  if (!workareaStore.isOpen) {
+    ElMessage.warning('请先打开或创建工区')
+    return
+  }
+
+  try {
+    const detected = await detectImportFile({ file_path: filePath })
+    if (detected.kind === 'image') {
+      dialogStore.showImportImage(filePath, detected.display_name || inferFileStem(filePath))
+      return
+    }
+
+    dialogStore.showImportFile(
+      detected.data_type || '',
+      filePath,
+      detected.well_name || '',
+    )
+
+    if (detected.data_type) {
+      ElMessage.success(`已识别为${getDataTypeLabel(detected.data_type)}`)
+    }
+    else {
+      ElMessage.warning('未能完全识别数据类型，请在弹窗中手动确认')
+    }
+  }
+  catch (error) {
+    console.error('Failed to detect dropped file:', error)
+    dialogStore.showImportFile('', filePath, '')
+    ElMessage.warning('未能自动识别数据类型，请手动选择')
+  }
+}
+
+function getDroppedPaths(event: DragEvent): string[] {
+  const files = Array.from(event.dataTransfer?.files || [])
+  return files
+    .map(file => (file as File & { path?: string }).path || '')
+    .filter(Boolean)
+}
+
+function isFileDrag(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types || []).includes('Files')
+}
+
+function handleWindowDragEnter(event: DragEvent) {
+  if (childWindowId.value || !isFileDrag(event)) {
+    return
+  }
+  event.preventDefault()
+  dragDepth.value += 1
+  dragOverlayVisible.value = true
+}
+
+function handleWindowDragOver(event: DragEvent) {
+  if (childWindowId.value || !isFileDrag(event)) {
+    return
+  }
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
+  dragOverlayVisible.value = true
+}
+
+function handleWindowDragLeave(event: DragEvent) {
+  if (childWindowId.value || !isFileDrag(event)) {
+    return
+  }
+  event.preventDefault()
+  dragDepth.value = Math.max(0, dragDepth.value - 1)
+  if (dragDepth.value === 0) {
+    dragOverlayVisible.value = false
+  }
+}
+
+async function handleWindowDrop(event: DragEvent) {
+  if (childWindowId.value || !isFileDrag(event)) {
+    return
+  }
+  event.preventDefault()
+  dragDepth.value = 0
+  dragOverlayVisible.value = false
+  const filePaths = getDroppedPaths(event)
+  if (!filePaths.length) {
+    return
+  }
+  if (filePaths.length > 1) {
+    ElMessage.info('当前一次仅处理第一个拖入文件')
+  }
+  await openDroppedFile(filePaths[0])
+}
 
 if (childWindowId.value) {
   // Mark body so global CSS can target teleported el-dialog
@@ -235,6 +353,20 @@ if (childWindowId.value) {
   }
 }
 
+onMounted(() => {
+  window.addEventListener('dragenter', handleWindowDragEnter)
+  window.addEventListener('dragover', handleWindowDragOver)
+  window.addEventListener('dragleave', handleWindowDragLeave)
+  window.addEventListener('drop', handleWindowDrop)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('dragenter', handleWindowDragEnter)
+  window.removeEventListener('dragover', handleWindowDragOver)
+  window.removeEventListener('dragleave', handleWindowDragLeave)
+  window.removeEventListener('drop', handleWindowDrop)
+})
+
 /** Force inline styles on the teleported dialog DOM — overrides everything */
 function applyChildWindowStyles() {
   const set = (el: HTMLElement | null, styles: Record<string, string>) => {
@@ -286,11 +418,46 @@ function onOpenWorkarea() {
 
 <style scoped lang="scss">
 .app-container {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.app-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.app-drop-card {
+  min-width: 320px;
+  padding: 28px 34px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 2px dashed #2563eb;
+  box-shadow: 0 24px 64px rgba(37, 99, 235, 0.18);
+  text-align: center;
+}
+
+.app-drop-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.app-drop-subtitle {
+  font-size: 14px;
+  color: #475569;
 }
 </style>
 

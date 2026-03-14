@@ -130,6 +130,7 @@
               <el-dropdown-item command="lithology">岩性</el-dropdown-item>
               <el-dropdown-item command="curve">曲线</el-dropdown-item>
               <el-dropdown-item command="discrete">离散</el-dropdown-item>
+              <el-dropdown-item command="fracture">裂缝</el-dropdown-item>
               <el-dropdown-item command="interpretation">解释结论</el-dropdown-item>
               <el-dropdown-item command="mineral">矿物百分比</el-dropdown-item>
               <el-dropdown-item command="text">文本</el-dropdown-item>
@@ -558,6 +559,7 @@ const TRACK_TYPE_LABELS: Record<string, string> = {
   lithology: '岩性',
   curve: '曲线',
   discrete: '离散',
+  fracture: '裂缝',
   interpretation: '解释',
   mineral: '矿物',
   text: '文本'
@@ -632,6 +634,7 @@ const TRACK_DEFAULTS: Record<string, { title: string; width: number }> = {
   lithology: { title: '岩性', width: 55 },
   curve: { title: '新曲线道', width: 140 },
   discrete: { title: '离散曲线', width: 120 },
+  fracture: { title: '裂缝道', width: 120 },
   interpretation: { title: '解释结论', width: 80 },
   mineral: { title: '矿物含量', width: 120 },
   text: { title: '综合结论', width: 80 }
@@ -648,6 +651,8 @@ function onAddTrack(type: string) {
   }
   if (type === 'curve' || type === 'discrete') {
     newTrack.curves = []
+  } else if (type === 'fracture') {
+    newTrack.fractureImages = []
   } else if (type === 'mineral') {
     newTrack.mineralCurves = []
   } else if (type === 'text') {

@@ -107,6 +107,16 @@ class UpdateCurveRequest(BaseModel):
     unit: Optional[str] = None
 
 
+class DeleteCurvePointsItemRequest(BaseModel):
+    curve_name: str
+    depths: list[float]
+
+
+class DeleteCurvePointsRequest(BaseModel):
+    workarea_path: str
+    items: list[DeleteCurvePointsItemRequest]
+
+
 class CreateLayerRequest(BaseModel):
     workarea_path: str
     formation: str
