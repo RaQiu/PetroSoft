@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { CompositeLogConfig, CurveColorRamp, CurveStyle, FractureImageConfig, GridConfig, LineStyleType, TrackConfig } from '@/types/compositeLog.ts'
-import type { CurveInfo, WellInfo } from '@/types/well'
+import type { ChartDetail, ChartInfo } from '@/api/chart'
+import type { CompositeLogConfig, CurveColorRamp, CurveStyle, FractureImageConfig, GridConfig, LineStyleType, MineralCurveConfig, TrackConfig } from '@/types/compositeLog.ts'
+import type { CurveInfo, LithologyInfo, WellInfo } from '@/types/well'
 import type { CompositeLogDebugEntry } from '@/utils/compositeLogDebug.ts'
-import type { CompositeLogData, FractureImageSelection, SelectedCurvePoint, SelectionRect } from '@/utils/compositeLogRenderer.ts'
+import type { CompositeLogData, FractureImageSelection, LithologySelection, SelectedCurvePoint, SelectionRect } from '@/utils/compositeLogRenderer.ts'
 import {
   Delete,
   DocumentChecked,
@@ -17,7 +18,7 @@ import * as chartApi from '@/api/chart'
 import * as wellApi from '@/api/well'
 import { useDialogStore } from '@/stores/dialog'
 import { useWorkareaStore } from '@/stores/workarea'
-import { createDefaultCurveStyle, createSuggestedTracks, DEFAULT_CURVE_COLOR_RAMP, defaultGridConfig, getCurvePreset, nextFractureImageId, nextTrackId, normalizeCurveStyle, normalizeFractureImage, normalizeTracksCurveStyles } from '@/types/compositeLog.ts'
+import { createDefaultCurveStyle, createSuggestedTracks, DEFAULT_CURVE_COLOR_RAMP, defaultGridConfig, getCurvePreset, MINERAL_COLORS, nextFractureImageId, nextTrackId, normalizeCurveStyle, normalizeFractureImage, normalizeTracksCurveStyles } from '@/types/compositeLog.ts'
 import { addCompositeLogDebugListener, emitCompositeLogDebug } from '@/utils/compositeLogDebug.ts'
 import { CompositeLogInteraction } from '@/utils/compositeLogInteraction.ts'
 import { CompositeLogRenderer } from '@/utils/compositeLogRenderer.ts'
@@ -62,6 +63,7 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 const canvasContainer = ref<HTMLDivElement | null>(null)
 const selectedTrackId = ref<string | null>(null)
 const selectedFractureImage = ref<FractureImageSelection | null>(null)
+const selectedLithology = ref<LithologySelection | null>(null)
 const fractureLibraryVisible = ref(false)
 const fractureLibraryLoading = ref(false)
 const fractureLibraryTargetTrackId = ref('')
@@ -74,6 +76,14 @@ const fractureLibraryItems = ref<Array<{
   height: number
 }>>([])
 const selectedFractureLibraryChartId = ref<number | null>(null)
+const savedChartPickerVisible = ref(false)
+const savedChartPickerLoading = ref(false)
+const savedCompositeCharts = ref<ChartInfo[]>([])
+const selectedSavedCompositeChartId = ref<number | null>(null)
+const curveDragIndex = ref<number | null>(null)
+const curveDropIndex = ref<number | null>(null)
+const mineralDragIndex = ref<number | null>(null)
+const mineralDropIndex = ref<number | null>(null)
 
 const config = ref<CompositeLogConfig>({
   wellName: '',
@@ -98,8 +108,60 @@ let resizeObs: ResizeObserver | null = null
 const crosshairPos = ref({ x: -1, y: -1 })
 const selectionRect = ref<SelectionRect | null>(null)
 const selectedCurvePoints = ref<SelectedCurvePoint[]>([])
+const DEBUG_PANEL_STORAGE_KEY = 'petrosoft:composite-log-debug-panel'
+const debugPanelVisible = ref(readDebugPanelVisible())
 const debugEntries = ref<CompositeLogDebugEntry[]>([])
 let removeDebugListener: (() => void) | null = null
+
+function readDebugPanelVisible(): boolean {
+  try {
+    return window.localStorage.getItem(DEBUG_PANEL_STORAGE_KEY) === '1'
+  }
+  catch {
+    return false
+  }
+}
+
+function persistDebugPanelVisible(visible: boolean) {
+  try {
+    window.localStorage.setItem(DEBUG_PANEL_STORAGE_KEY, visible ? '1' : '0')
+  }
+  catch {
+    // ignore storage failures
+  }
+}
+
+function attachDebugPanelListener() {
+  if (removeDebugListener) {
+    return
+  }
+  removeDebugListener = addCompositeLogDebugListener((entry) => {
+    debugEntries.value = [entry, ...debugEntries.value].slice(0, 10)
+  })
+}
+
+function detachDebugPanelListener(clearEntries = true) {
+  removeDebugListener?.()
+  removeDebugListener = null
+  if (clearEntries) {
+    debugEntries.value = []
+  }
+}
+
+function setDebugPanelVisible(visible: boolean) {
+  debugPanelVisible.value = visible
+  persistDebugPanelVisible(visible)
+  if (visible) {
+    attachDebugPanelListener()
+  }
+  else {
+    detachDebugPanelListener(true)
+  }
+}
+
+function toggleDebugPanel() {
+  setDebugPanelVisible(!debugPanelVisible.value)
+}
 
 function formatDebugPayload(payload: Record<string, unknown>): string {
   return JSON.stringify(payload)
@@ -149,6 +211,13 @@ const selectedTrack = computed(() => {
   if (!selectedTrackId.value)
     return null
   return config.value.tracks.find(t => t.id === selectedTrackId.value) || null
+})
+
+const selectedLithologyEntry = computed(() => {
+  if (!selectedLithology.value) {
+    return null
+  }
+  return logData.value.lithology.find(entry => entry.id === selectedLithology.value?.lithologyId) || null
 })
 
 // ── Selected track property editing ──
@@ -573,6 +642,180 @@ function onSelRemoveCurve(curveIdx: number) {
   config.value = { ...config.value, tracks }
 }
 
+function clearCurveDragState() {
+  curveDragIndex.value = null
+  curveDropIndex.value = null
+}
+
+function moveSelectedCurve(fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) {
+    return
+  }
+  const idx = getSelectedTrackIndex()
+  if (idx < 0) {
+    return
+  }
+  const tracks = [...config.value.tracks]
+  const track = { ...tracks[idx] }
+  const curves = [...(track.curves || [])]
+  if (fromIndex < 0 || fromIndex >= curves.length || toIndex < 0 || toIndex >= curves.length) {
+    return
+  }
+  const [moved] = curves.splice(fromIndex, 1)
+  curves.splice(toIndex, 0, moved)
+  track.curves = curves
+  tracks[idx] = track
+  config.value = { ...config.value, tracks }
+}
+
+function onSelCurveDragStart(curveIdx: number, event: DragEvent) {
+  curveDragIndex.value = curveIdx
+  curveDropIndex.value = curveIdx
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(curveIdx))
+  }
+}
+
+function onSelCurveDragOver(curveIdx: number, event: DragEvent) {
+  if (curveDragIndex.value === null) {
+    return
+  }
+  event.preventDefault()
+  curveDropIndex.value = curveIdx
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+function onSelCurveDrop(curveIdx: number, event: DragEvent) {
+  event.preventDefault()
+  const fromIndex = curveDragIndex.value
+  clearCurveDragState()
+  if (fromIndex === null) {
+    return
+  }
+  moveSelectedCurve(fromIndex, curveIdx)
+}
+
+function onSelCurveDragEnd() {
+  clearCurveDragState()
+}
+
+function onSelAddMineral() {
+  const idx = getSelectedTrackIndex()
+  if (idx < 0)
+    return
+  const tracks = [...config.value.tracks]
+  const track = { ...tracks[idx] }
+  const minerals = [...(track.mineralCurves || [])]
+  const usedColors = new Set(minerals.map(mineral => mineral.color))
+  const defaultColor = Object.values(MINERAL_COLORS).find(color => !usedColors.has(color)) || '#999999'
+  minerals.push({ curveName: '', color: defaultColor, label: '' })
+  track.mineralCurves = minerals
+  tracks[idx] = track
+  config.value = { ...config.value, tracks }
+}
+
+function onSelRemoveMineral(mineralIdx: number) {
+  const idx = getSelectedTrackIndex()
+  if (idx < 0)
+    return
+  const tracks = [...config.value.tracks]
+  const track = { ...tracks[idx] }
+  const minerals = [...(track.mineralCurves || [])]
+  minerals.splice(mineralIdx, 1)
+  track.mineralCurves = minerals
+  tracks[idx] = track
+  config.value = { ...config.value, tracks }
+}
+
+function clearMineralDragState() {
+  mineralDragIndex.value = null
+  mineralDropIndex.value = null
+}
+
+function moveSelectedMineral(fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) {
+    return
+  }
+  const idx = getSelectedTrackIndex()
+  if (idx < 0) {
+    return
+  }
+  const tracks = [...config.value.tracks]
+  const track = { ...tracks[idx] }
+  const minerals = [...(track.mineralCurves || [])]
+  if (fromIndex < 0 || fromIndex >= minerals.length || toIndex < 0 || toIndex >= minerals.length) {
+    return
+  }
+  const [moved] = minerals.splice(fromIndex, 1)
+  minerals.splice(toIndex, 0, moved)
+  track.mineralCurves = minerals
+  tracks[idx] = track
+  config.value = { ...config.value, tracks }
+}
+
+function onSelMineralDragStart(mineralIdx: number, event: DragEvent) {
+  mineralDragIndex.value = mineralIdx
+  mineralDropIndex.value = mineralIdx
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(mineralIdx))
+  }
+}
+
+function onSelMineralDragOver(mineralIdx: number, event: DragEvent) {
+  if (mineralDragIndex.value === null) {
+    return
+  }
+  event.preventDefault()
+  mineralDropIndex.value = mineralIdx
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+function onSelMineralDrop(mineralIdx: number, event: DragEvent) {
+  event.preventDefault()
+  const fromIndex = mineralDragIndex.value
+  clearMineralDragState()
+  if (fromIndex === null) {
+    return
+  }
+  moveSelectedMineral(fromIndex, mineralIdx)
+}
+
+function onSelMineralDragEnd() {
+  clearMineralDragState()
+}
+
+async function onSelMineralFieldChange(mineralIdx: number, field: keyof MineralCurveConfig, value: unknown) {
+  const idx = getSelectedTrackIndex()
+  if (idx < 0)
+    return
+  const tracks = [...config.value.tracks]
+  const track = { ...tracks[idx] }
+  const minerals = [...(track.mineralCurves || [])]
+  const current = minerals[mineralIdx]
+  if (!current) {
+    return
+  }
+
+  minerals[mineralIdx] = { ...current, [field]: value } as MineralCurveConfig
+  if (field === 'curveName' && !minerals[mineralIdx].label) {
+    minerals[mineralIdx] = { ...minerals[mineralIdx], label: String(value || '') }
+  }
+
+  track.mineralCurves = minerals
+  tracks[idx] = track
+  config.value = { ...config.value, tracks }
+
+  if (field === 'curveName') {
+    await refreshCurveData()
+  }
+}
+
 function updateFractureImage(trackId: string, imageId: string, patch: Partial<FractureImageConfig>) {
   updateTrack(trackId, (track) => {
     const images = (track.fractureImages || []).map((image) => {
@@ -693,6 +936,44 @@ function onSelectedFractureImageField(imageId: string, field: 'name' | 'opacity'
   }
   if (field === 'opacity' && typeof value === 'number' && Number.isFinite(value)) {
     updateFractureImage(selectedTrack.value.id, imageId, { opacity: value })
+  }
+}
+
+function applyLithologyEntryPatch(entryId: number, patch: Partial<LithologyInfo>) {
+  const nextLithology = logData.value.lithology
+    .map(entry => entry.id === entryId ? { ...entry, ...patch } : entry)
+    .sort((a, b) => a.top_depth - b.top_depth)
+  logData.value = {
+    ...logData.value,
+    lithology: nextLithology,
+  }
+  scheduleRender()
+}
+
+async function onSelectedLithologyField(field: keyof Pick<LithologyInfo, 'top_depth' | 'bottom_depth' | 'description'>, value: unknown) {
+  if (!config.value.wellName || !selectedLithologyEntry.value) {
+    return
+  }
+
+  const patch: Partial<LithologyInfo> = {}
+  if ((field === 'top_depth' || field === 'bottom_depth') && typeof value === 'number' && Number.isFinite(value)) {
+    patch[field] = value
+  }
+  else if (field === 'description' && typeof value === 'string') {
+    patch.description = value
+  }
+  else {
+    return
+  }
+
+  try {
+    await wellApi.updateLithology(config.value.wellName, selectedLithologyEntry.value.id, workareaStore.path, patch)
+    applyLithologyEntryPatch(selectedLithologyEntry.value.id, patch)
+    ElMessage.success('岩性属性已更新')
+  }
+  catch (error) {
+    console.error('Failed to update lithology:', error)
+    ElMessage.error('更新岩性属性失败')
   }
 }
 
@@ -1008,6 +1289,11 @@ watch(
 
 watch(config, () => scheduleRender(), { deep: true })
 watch(selectedTrackId, (trackId) => {
+  clearCurveDragState()
+  clearMineralDragState()
+  if (selectedLithology.value && selectedLithology.value.trackId !== trackId) {
+    selectedLithology.value = null
+  }
   if (selectedFractureImage.value && selectedFractureImage.value.trackId !== trackId) {
     selectedFractureImage.value = null
   }
@@ -1019,6 +1305,7 @@ async function onWellChange(wellName: string) {
   clearSelectedCurvePoints()
   selectionRect.value = null
   selectedFractureImage.value = null
+  selectedLithology.value = null
   if (!wellName) {
     config.value = { ...config.value, wellName: '', tracks: [] }
     logData.value = { curveData: {}, layers: [], lithology: [], interpretations: [] }
@@ -1177,6 +1464,12 @@ function createInteractionCallbacks() {
     onTrackSelect: (trackId: string | null) => {
       selectedTrackId.value = trackId
     },
+    onLithologySelect: (selection) => {
+      selectedLithology.value = selection
+      if (selection) {
+        selectedTrackId.value = selection.trackId
+      }
+    },
     onFractureImageSelect: (trackId: string | null, imageId: string | null) => {
       if (trackId && imageId) {
         selectFractureImage(trackId, imageId)
@@ -1227,15 +1520,14 @@ function destroyCanvas() {
   selectionRect.value = null
   clearSelectedCurvePoints()
   selectedFractureImage.value = null
-  removeDebugListener?.()
-  removeDebugListener = null
+  detachDebugPanelListener(false)
 }
 
 onBeforeUnmount(destroyCanvas)
 
-removeDebugListener = addCompositeLogDebugListener((entry) => {
-  debugEntries.value = [entry, ...debugEntries.value].slice(0, 10)
-})
+if (debugPanelVisible.value) {
+  attachDebugPanelListener()
+}
 
 function scheduleRender() {
   if (rafId)
@@ -1251,6 +1543,9 @@ function doRender() {
   renderer.setSelectedTrack(selectedTrackId.value)
   renderer.setSelectionRect(selectionRect.value)
   renderer.setSelectedCurvePoints(selectedCurvePoints.value)
+  if ('setSelectedLithology' in renderer && typeof renderer.setSelectedLithology === 'function') {
+    renderer.setSelectedLithology(selectedLithology.value)
+  }
   if ('setSelectedFractureImage' in renderer && typeof renderer.setSelectedFractureImage === 'function') {
     renderer.setSelectedFractureImage(selectedFractureImage.value)
   }
@@ -1322,56 +1617,70 @@ async function onSave() {
   catch { ElMessage.error('保存失败') }
 }
 
+async function applySavedChart(chart: ChartDetail) {
+  const parsed = JSON.parse(chart.config) as CompositeLogConfig
+  clearSelectedCurvePoints()
+  selectionRect.value = null
+  selectedTrackId.value = null
+  selectedFractureImage.value = null
+  selectedLithology.value = null
+  config.value = { ...parsed, tracks: normalizeTracksCurveStyles(parsed.tracks || []) }
+  if (parsed.wellName) {
+    await loadCurveList(parsed.wellName)
+    const [layers, lithology, interpretations] = await Promise.all([
+      wellApi.getLayers(parsed.wellName, workareaStore.path).catch(() => []),
+      wellApi.getLithology(parsed.wellName, workareaStore.path).catch(() => []),
+      wellApi.getInterpretation(parsed.wellName, workareaStore.path).catch(() => []),
+    ])
+    logData.value = { curveData: {}, layers, lithology, interpretations }
+    await refreshCurveData()
+    const curveRange = computeCurveClusterDepthRange(config.value.tracks)
+    if (curveRange) {
+      config.value = { ...config.value, depthRange: curveRange }
+    }
+  }
+}
+
 async function onLoad() {
   try {
+    savedChartPickerLoading.value = true
     const charts = await chartApi.listCharts(workareaStore.path, 'composite_log')
     if (!charts.length) {
+      savedChartPickerVisible.value = false
       ElMessage.info('暂无已保存的综合柱状图')
       return
     }
-    const chart = await chartApi.getChart(workareaStore.path, charts[0].id)
-    const parsed = JSON.parse(chart.config) as CompositeLogConfig
-    selectedFractureImage.value = null
-    config.value = { ...parsed, tracks: normalizeTracksCurveStyles(parsed.tracks || []) }
-    if (parsed.wellName) {
-      await loadCurveList(parsed.wellName)
-      const [layers, lithology, interpretations] = await Promise.all([
-        wellApi.getLayers(parsed.wellName, workareaStore.path).catch(() => []),
-        wellApi.getLithology(parsed.wellName, workareaStore.path).catch(() => []),
-        wellApi.getInterpretation(parsed.wellName, workareaStore.path).catch(() => []),
-      ])
-      logData.value = { curveData: {}, layers, lithology, interpretations }
-      await refreshCurveData()
-      const curveRange = computeCurveClusterDepthRange(config.value.tracks)
-      if (curveRange) {
-        config.value = { ...config.value, depthRange: curveRange }
-      }
-    }
-    ElMessage.success(`已加载: ${chart.name}`)
+    savedCompositeCharts.value = charts
+    selectedSavedCompositeChartId.value = charts[0]?.id || null
+    savedChartPickerVisible.value = true
   }
   catch { ElMessage.error('加载失败') }
+  finally {
+    savedChartPickerLoading.value = false
+  }
+}
+
+async function confirmLoadSavedChart() {
+  const chartId = selectedSavedCompositeChartId.value
+  if (!chartId) {
+    ElMessage.warning('请选择要加载的成果图')
+    return
+  }
+  try {
+    const chart = await chartApi.getChart(workareaStore.path, chartId)
+    await applySavedChart(chart)
+    savedChartPickerVisible.value = false
+    ElMessage.success(`已加载: ${chart.name}`)
+  }
+  catch {
+    ElMessage.error('加载失败')
+  }
 }
 
 async function loadSavedChart(chartId: number) {
   try {
     const chart = await chartApi.getChart(workareaStore.path, chartId)
-    const parsed = JSON.parse(chart.config) as CompositeLogConfig
-    selectedFractureImage.value = null
-    config.value = { ...parsed, tracks: normalizeTracksCurveStyles(parsed.tracks || []) }
-    if (parsed.wellName) {
-      await loadCurveList(parsed.wellName)
-      const [layers, lithology, interpretations] = await Promise.all([
-        wellApi.getLayers(parsed.wellName, workareaStore.path).catch(() => []),
-        wellApi.getLithology(parsed.wellName, workareaStore.path).catch(() => []),
-        wellApi.getInterpretation(parsed.wellName, workareaStore.path).catch(() => []),
-      ])
-      logData.value = { curveData: {}, layers, lithology, interpretations }
-      await refreshCurveData()
-      const curveRange = computeCurveClusterDepthRange(config.value.tracks)
-      if (curveRange) {
-        config.value = { ...config.value, depthRange: curveRange }
-      }
-    }
+    await applySavedChart(chart)
   }
   catch { console.error('Failed to load saved chart') }
 }
@@ -1652,6 +1961,14 @@ function ctxImportFractureFromLibrary() {
       <el-button size="small" :icon="Download" @click="exportPng">
         导出
       </el-button>
+      <el-button
+        size="small"
+        :type="debugPanelVisible ? 'primary' : 'default'"
+        plain
+        @click="toggleDebugPanel"
+      >
+        {{ debugPanelVisible ? '关闭调试' : '前端调试' }}
+      </el-button>
       <div class="toolbar-spacer" />
       <span class="toolbar-info">
         竖拖移轴 / 斜拖框选 / 裂缝图拖拽缩放 |
@@ -1688,6 +2005,11 @@ function ctxImportFractureFromLibrary() {
         <template v-if="selectedTrack.type === 'curve' || selectedTrack.type === 'discrete'">
           <el-button size="small" @click="onAddCurveToSelected">
             + 曲线
+          </el-button>
+        </template>
+        <template v-else-if="selectedTrack.type === 'mineral'">
+          <el-button size="small" @click="onSelAddMineral">
+            + 矿物
           </el-button>
         </template>
         <template v-else-if="selectedTrack.type === 'fracture'">
@@ -1756,9 +2078,136 @@ function ctxImportFractureFromLibrary() {
         </div>
       </template>
 
+      <template v-else-if="selectedTrack.type === 'lithology'">
+        <div class="prop-row">
+          <span class="fracture-hint">点击岩性段可选中并修改顶深、底深和描述</span>
+        </div>
+        <template v-if="selectedLithologyEntry">
+          <div class="prop-row">
+            <span class="prop-label">顶深:</span>
+            <el-input-number
+              :model-value="selectedLithologyEntry.top_depth"
+              size="small"
+              :step="0.1"
+              controls-position="right"
+              style="width: 110px"
+              @change="onSelectedLithologyField('top_depth', $event)"
+            />
+            <span class="prop-label">底深:</span>
+            <el-input-number
+              :model-value="selectedLithologyEntry.bottom_depth"
+              size="small"
+              :step="0.1"
+              controls-position="right"
+              style="width: 110px"
+              @change="onSelectedLithologyField('bottom_depth', $event)"
+            />
+          </div>
+          <div class="prop-row">
+            <span class="prop-label">描述:</span>
+            <el-input
+              :model-value="selectedLithologyEntry.description"
+              size="small"
+              style="width: 320px"
+              placeholder="请输入岩性描述"
+              @change="onSelectedLithologyField('description', $event)"
+            />
+          </div>
+        </template>
+        <div v-else class="prop-row">
+          <span class="fracture-hint">当前未选中岩性段</span>
+        </div>
+      </template>
+
+      <template v-else-if="selectedTrack.type === 'formation'">
+        <div class="prop-row">
+          <span class="fracture-hint">地层道按分层名称显示对应名字</span>
+        </div>
+      </template>
+
+      <template v-else-if="selectedTrack.type === 'mineral'">
+        <div class="prop-row">
+          <span class="fracture-hint">矿物按当前顺序从左到右按 0–100 累加堆叠，拖动左侧手柄可调整顺序</span>
+        </div>
+        <div v-if="selectedTrack.mineralCurves?.length">
+          <div
+            v-for="(mc, mi) in selectedTrack.mineralCurves"
+            :key="`${mc.curveName}-${mi}`"
+            class="prop-row curve-row"
+            :class="{
+              'mineral-row-dragging': mineralDragIndex === mi,
+              'mineral-row-drop-target': mineralDropIndex === mi && mineralDragIndex !== mi,
+            }"
+            @dragover="onSelMineralDragOver(mi, $event)"
+            @drop="onSelMineralDrop(mi, $event)"
+          >
+            <span
+              class="row-drag-handle"
+              title="拖动调整顺序"
+              draggable="true"
+              @dragstart="onSelMineralDragStart(mi, $event)"
+              @dragend="onSelMineralDragEnd"
+            >⋮⋮</span>
+            <span class="prop-label">矿物:</span>
+            <el-select
+              :model-value="mc.curveName"
+              size="small"
+              filterable
+              placeholder="选择曲线"
+              style="width: 140px"
+              @change="onSelMineralFieldChange(mi, 'curveName', $event as string)"
+            >
+              <el-option
+                v-for="c in availableCurves"
+                :key="c.name"
+                :label="`${c.name} (${c.unit})`"
+                :value="c.name"
+              />
+            </el-select>
+            <span class="prop-label">颜色:</span>
+            <el-color-picker
+              :model-value="mc.color"
+              size="small"
+              @change="onSelMineralFieldChange(mi, 'color', $event as string)"
+            />
+            <span class="prop-label">标签:</span>
+            <el-input
+              :model-value="mc.label"
+              size="small"
+              style="width: 120px"
+              placeholder="标签"
+              @change="onSelMineralFieldChange(mi, 'label', $event)"
+            />
+            <el-button size="small" type="danger" plain @click="onSelRemoveMineral(mi)">
+              删除
+            </el-button>
+          </div>
+        </div>
+        <div v-else class="prop-row">
+          <span class="fracture-hint">当前矿物道还没有配置曲线</span>
+        </div>
+      </template>
+
       <!-- Curve rows (for curve/discrete tracks) -->
       <template v-if="(selectedTrack.type === 'curve' || selectedTrack.type === 'discrete') && selectedTrack.curves?.length">
-        <div v-for="(cs, ci) in selectedTrack.curves" :key="ci" class="prop-row curve-row">
+        <div
+          v-for="(cs, ci) in selectedTrack.curves"
+          :key="ci"
+          class="prop-row curve-row"
+          :class="{
+            'curve-row-dragging': curveDragIndex === ci,
+            'curve-row-drop-target': curveDropIndex === ci && curveDragIndex !== ci,
+          }"
+          @dragover="onSelCurveDragOver(ci, $event)"
+          @drop="onSelCurveDrop(ci, $event)"
+        >
+          <span
+            class="row-drag-handle"
+            title="拖动调整顺序"
+            draggable="true"
+            @dragstart="onSelCurveDragStart(ci, $event)"
+            @dragend="onSelCurveDragEnd"
+          >⋮⋮</span>
           <span class="prop-label">曲线:</span>
           <el-select
             :model-value="cs.curveName"
@@ -1981,9 +2430,14 @@ function ctxImportFractureFromLibrary() {
     <div class="cl-body">
       <div ref="canvasContainer" class="cl-canvas-wrapper">
         <canvas ref="canvasRef" class="cl-canvas" />
-        <div v-if="debugEntries.length" class="cl-debug-panel">
-          <div class="cl-debug-title">
-            前端调试
+        <div v-if="debugPanelVisible && debugEntries.length" class="cl-debug-panel">
+          <div class="cl-debug-head">
+            <div class="cl-debug-title">
+              前端调试
+            </div>
+            <button type="button" class="cl-debug-close" @click="setDebugPanelVisible(false)">
+              关闭
+            </button>
           </div>
           <div v-for="(entry, index) in debugEntries" :key="`${entry.timestamp}-${entry.channel}-${entry.event}-${index}`" class="cl-debug-item">
             <div class="cl-debug-meta">
@@ -2031,6 +2485,42 @@ function ctxImportFractureFromLibrary() {
         </el-button>
         <el-button type="primary" @click="confirmFractureLibraryImport">
           导入
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="savedChartPickerVisible"
+      title="选择综合柱状图成果"
+      width="620px"
+      append-to-body
+    >
+      <div v-loading="savedChartPickerLoading" class="fracture-library">
+        <div v-if="savedCompositeCharts.length" class="saved-chart-list">
+          <button
+            v-for="chart in savedCompositeCharts"
+            :key="chart.id"
+            type="button"
+            class="saved-chart-item"
+            :class="{ 'saved-chart-item-active': selectedSavedCompositeChartId === chart.id }"
+            @click="selectedSavedCompositeChartId = chart.id"
+          >
+            <div class="saved-chart-name">
+              {{ chart.name }}
+            </div>
+            <div class="saved-chart-time">
+              {{ chart.created_at }}
+            </div>
+          </button>
+        </div>
+        <el-empty v-else description="暂无已保存的综合柱状图" />
+      </div>
+      <template #footer>
+        <el-button @click="savedChartPickerVisible = false">
+          取消
+        </el-button>
+        <el-button type="primary" @click="confirmLoadSavedChart">
+          加载
         </el-button>
       </template>
     </el-dialog>
@@ -2276,7 +2766,14 @@ function ctxImportFractureFromLibrary() {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
   font-size: 11px;
   line-height: 1.45;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.cl-debug-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .cl-debug-title {
@@ -2284,6 +2781,20 @@ function ctxImportFractureFromLibrary() {
   font-weight: 600;
   margin-bottom: 6px;
   color: #fde68a;
+}
+
+.cl-debug-close {
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+}
+
+.cl-debug-close:hover {
+  color: #fff;
 }
 
 .cl-debug-item {
@@ -2375,6 +2886,73 @@ function ctxImportFractureFromLibrary() {
   font-size: 13px;
   color: #334155;
   word-break: break-all;
+}
+
+.saved-chart-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.saved-chart-item {
+  width: 100%;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.saved-chart-item:hover {
+  border-color: #60a5fa;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.08);
+}
+
+.saved-chart-item-active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.saved-chart-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.saved-chart-time {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.row-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  color: #94a3b8;
+  cursor: grab;
+  user-select: none;
+}
+
+.curve-row-dragging {
+  opacity: 0.5;
+}
+
+.curve-row-drop-target {
+  outline: 1px dashed #2563eb;
+  background: rgba(37, 99, 235, 0.05);
+}
+
+.mineral-row-dragging {
+  opacity: 0.5;
+}
+
+.mineral-row-drop-target {
+  outline: 1px dashed #2563eb;
+  background: rgba(37, 99, 235, 0.05);
 }
 
 .ctx-menu {

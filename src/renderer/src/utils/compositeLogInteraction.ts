@@ -1,6 +1,6 @@
 // ── Composite Log interaction: zoom, pan, crosshair, right-click, track drag/select ──
 
-import type { CompositeLogRenderer, FractureImageHitTarget, SelectionRect } from './compositeLogRenderer'
+import type { CompositeLogRenderer, FractureImageHitTarget, LithologySelection, SelectionRect } from './compositeLogRenderer'
 import type { CompositeLogConfig, TrackConfig } from '@/types/compositeLog'
 import { emitCompositeLogDebug } from './compositeLogDebug'
 
@@ -19,6 +19,7 @@ export interface InteractionCallbacks {
   onSelectionComplete?: (rect: SelectionRect) => void
   onTrackReorder?: (fromTrackId: string, toTrackId: string) => void
   onTrackSelect?: (trackId: string | null) => void
+  onLithologySelect?: (selection: LithologySelection | null) => void
   onFractureImageSelect?: (trackId: string | null, imageId: string | null) => void
   onFractureImageChange?: (
     trackId: string,
@@ -281,7 +282,8 @@ export class CompositeLogInteraction {
     }
     else {
       const fractureHit = this.renderer.findFractureImageAtPoint(x, y)
-      this.canvas.style.cursor = fractureHit ? this.getFractureCursor(fractureHit.handle) : 'crosshair'
+      const lithologyHit = this.renderer.findLithologyAtPoint?.(x, y)
+      this.canvas.style.cursor = fractureHit ? this.getFractureCursor(fractureHit.handle) : lithologyHit ? 'pointer' : 'crosshair'
     }
 
     this.callbacks.onCrosshairMove(x, y)
@@ -427,6 +429,8 @@ export class CompositeLogInteraction {
 
     if (this.bodyDragStart) {
       if (wasClick) {
+        const lithologyHit = this.renderer.findLithologyAtPoint?.(x, y) || null
+        this.callbacks.onLithologySelect?.(lithologyHit)
         const track = this.renderer.findTrackAtX(x)
         this.callbacks.onTrackSelect?.(track?.id ?? null)
       }

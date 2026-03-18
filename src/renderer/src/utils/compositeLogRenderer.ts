@@ -39,6 +39,11 @@ export interface FractureImageSelection {
   imageId: string
 }
 
+export interface LithologySelection {
+  trackId: string
+  lithologyId: number
+}
+
 export interface FractureImageHitTarget extends FractureImageSelection {
   handle: FractureImageHandle
 }
@@ -119,6 +124,7 @@ export class CompositeLogRenderer {
   private _selectedCurvePoints: SelectedCurvePoint[] = []
   private _gridDebugState = new Map<string, string>()
   private _selectedFractureImage: FractureImageSelection | null = null
+  private _selectedLithology: LithologySelection | null = null
   private _fractureImageRects: FractureImageRenderRect[] = []
   private _imageCache = new Map<string, HTMLImageElement | null>()
 
@@ -157,6 +163,10 @@ export class CompositeLogRenderer {
 
   setSelectedFractureImage(selection: FractureImageSelection | null) {
     this._selectedFractureImage = selection
+  }
+
+  setSelectedLithology(selection: LithologySelection | null) {
+    this._selectedLithology = selection
   }
 
   getMetrics(): RenderMetrics | null {
@@ -658,13 +668,13 @@ export class CompositeLogRenderer {
 
     switch (track.type) {
       case 'formation':
-        this.drawFormationTrack(x, y, w, h)
+        this.drawFormationTrack(track, x, y, w, h)
         break
       case 'depth':
         this.drawDepthTrack(x, y, w, h)
         break
       case 'lithology':
-        this.drawLithologyTrack(x, y, w, h)
+        this.drawLithologyTrack(track, x, y, w, h)
         break
       case 'curve':
         this.drawCurveTrack(track, x, y, w, h)
@@ -691,7 +701,7 @@ export class CompositeLogRenderer {
 
   // ── Formation track ──
 
-  private drawFormationTrack(x: number, y: number, w: number, h: number) {
+  private drawFormationTrack(track: TrackConfig, x: number, y: number, w: number, h: number) {
     const ctx = this.ctx
     const layers = this.data.layers
     if (!layers.length)
@@ -719,27 +729,21 @@ export class CompositeLogRenderer {
       ctx.lineTo(x + w, clampY1)
       ctx.stroke()
 
-      // formation name — always draw vertically (professional standard)
+      // formation name — render full name vertically so intervals still show the label
       const segHeight = clampY2 - clampY1
       const midY = (clampY1 + clampY2) / 2
-      const name = layer.formation || ''
+      const name = (track.formationColumn === 'code' ? layer.formation : layer.formation || '').trim()
 
-      if (name && segHeight > 16) {
+      if (name && segHeight > 24) {
         ctx.fillStyle = '#222'
-        ctx.font = 'bold 11px "Microsoft YaHei", "PingFang SC", sans-serif'
+        ctx.font = 'bold 10px "Microsoft YaHei", "PingFang SC", sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-
-        const charH = 14
-        const totalTextH = name.length * charH
-        // clamp text within visible segment
-        const textTop = midY - totalTextH / 2
-        for (let ci = 0; ci < name.length; ci++) {
-          const charY = textTop + ci * charH + charH / 2
-          if (charY > clampY1 + 4 && charY < clampY2 - 4) {
-            ctx.fillText(name[ci], x + w / 2, charY)
-          }
-        }
+        ctx.save()
+        ctx.translate(x + w / 2, midY)
+        ctx.rotate(-Math.PI / 2)
+        ctx.fillText(name, 0, 0, Math.max(0, segHeight - 8))
+        ctx.restore()
       }
     }
 
@@ -810,7 +814,7 @@ export class CompositeLogRenderer {
 
   // ── Lithology track ──
 
-  private drawLithologyTrack(x: number, y: number, w: number, h: number) {
+  private drawLithologyTrack(track: TrackConfig, x: number, y: number, w: number, h: number) {
     const ctx = this.ctx
     const lithoData = this.data.lithology
     if (!lithoData.length)
@@ -854,6 +858,18 @@ export class CompositeLogRenderer {
       ctx.strokeStyle = '#000'
       ctx.lineWidth = 0.6
       ctx.strokeRect(x + 0.3, clampY1 + 0.3, segW - 0.6, segH - 0.6)
+
+      if (
+        this._selectedLithology
+        && this._selectedLithology.trackId === track.id
+        && this._selectedLithology.lithologyId === litho.id
+      ) {
+        ctx.save()
+        ctx.strokeStyle = '#2563eb'
+        ctx.lineWidth = 2
+        ctx.strokeRect(x + 1, clampY1 + 1, Math.max(0, segW - 2), Math.max(0, segH - 2))
+        ctx.restore()
+      }
 
       // 4. Red triangle (△) at boundary if same lithology continues
       if (i > 0 && patternId !== null && patternIds[i - 1] === patternId) {
@@ -1172,30 +1188,31 @@ export class CompositeLogRenderer {
       const py2 = this.depthToY(nextDepth)
       const barH = Math.max(py2 - py, 0.5)
 
-      let total = 0
-      const vals: Array<{ val: number, color: string }> = []
+      let cumulative = 0
+      const vals: Array<{ start: number, end: number, color: string }> = []
       for (const mc of minerals) {
         const pts = this.data.curveData[mc.curveName]
         if (!pts)
           continue
         const pt = pts[i] || pts.find(p => Math.abs(p.depth - depth) < 0.5)
         const v = pt?.value != null && pt.value !== -9999 ? Math.max(0, pt.value) : 0
-        vals.push({ val: v, color: mc.color })
-        total += v
+        if (v <= 0 || cumulative >= 100)
+          continue
+        const start = cumulative
+        cumulative = Math.min(100, cumulative + v)
+        vals.push({ start, end: cumulative, color: mc.color })
       }
-      if (total <= 0)
+      if (!vals.length)
         continue
 
-      let bx = x
-      for (const { val, color } of vals) {
-        const bw = (val / total) * w
+      for (const { start, end, color } of vals) {
+        const bx = x + (start / 100) * w
+        const bw = ((end - start) / 100) * w
         if (bw < 0.3) {
-          bx += bw
           continue
         }
         ctx.fillStyle = color
         ctx.fillRect(bx, py, bw, barH)
-        bx += bw
       }
     }
 
@@ -1638,6 +1655,24 @@ export class CompositeLogRenderer {
       }
       return a.curveName.localeCompare(b.curveName, 'zh-CN')
     })
+  }
+
+  findLithologyAtPoint(mouseX: number, mouseY: number): LithologySelection | null {
+    const track = this.findTrackAtX(mouseX)
+    if (!track || track.type !== 'lithology') {
+      return null
+    }
+    for (const litho of this.data.lithology) {
+      const y1 = this.depthToY(litho.top_depth)
+      const y2 = this.depthToY(litho.bottom_depth)
+      if (mouseY >= y1 && mouseY <= y2) {
+        return {
+          trackId: track.id,
+          lithologyId: litho.id,
+        }
+      }
+    }
+    return null
   }
 
   findFractureImageAtPoint(mouseX: number, mouseY: number): FractureImageHitTarget | null {
